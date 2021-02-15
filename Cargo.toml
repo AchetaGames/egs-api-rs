@@ -1,7 +1,13 @@
 [package]
 name = "egs-api"
 version = "0.1.0"
-authors = ["mistastn <mistastn@cisco.com>"]
+authors = ["Milan Šťastný <milan@acheta.games>"]
+description  = "Interface to the Epic Games API"
+categories = ["asynchronous"]
+keywords = ["Epic Games", "Epic", "egs"]
+license = "MIT"
+readme = "README.md"
+
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
