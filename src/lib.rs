@@ -1,8 +1,9 @@
 use reqwest::{header};
 
-mod api;
+pub mod api;
 
-use crate::api::EpicAPI;
+use crate::api::{EpicAPI, EpicAPIError, EpicAsset};
+use chrono::{Utc, DateTime};
 
 
 pub struct EpicGames {
@@ -66,6 +67,68 @@ impl EpicGames {
     }
 
     pub async fn auth_code(&mut self, code: String) -> bool {
-        self.egs.start_session(None, Some(code)).await
+        match self.egs.start_session(None, Some(code)).await {
+            Ok(b) => { return b; }
+            Err(_) => { return false; }
+        }
+    }
+
+    pub async fn login(&mut self) -> bool {
+        match self.egs.user_data.expires_at {
+            None => {}
+            Some(exp) => {
+                let now = chrono::offset::Utc::now();
+                let td = exp - now;
+                if td.num_seconds() > 600 {
+                    println!("Trying to re-use existing login session... ");
+                    match self.egs.resume_session().await {
+                        Ok(b) => {
+                            if b {
+                                println!("Logged in");
+                                return true;
+                            }
+                            return false;
+                        }
+                        Err(e) => {
+                            println!("Error: {}", e)
+                        }
+                    };
+                }
+            }
+        }
+        println!("Logging in...");
+        match self.egs.user_data.refresh_expires_at {
+            None => {}
+            Some(exp) => {
+                let now = chrono::offset::Utc::now();
+                let td = exp - now;
+                if td.num_seconds() > 600 {
+                    match &self.egs.user_data.refresh_token {
+                        None => {}
+                        Some(rt) => {
+                            match self.egs.start_session(Some(rt.to_string()), None).await {
+                                Ok(b) => {
+                                    if b {
+                                        println!("Logged in");
+                                        return true;
+                                    }
+                                    return false;
+                                }
+                                Err(e) => { println!("Error: {}", e) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+
+    pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
+        match self.egs.get_assets(None, None).await {
+            Ok(b) => { return b; }
+            Err(_) => { return Vec::new(); }
+        }
     }
 }
