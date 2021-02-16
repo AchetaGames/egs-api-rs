@@ -2,8 +2,10 @@ use reqwest::{header};
 
 pub mod api;
 
-use crate::api::{EpicAPI, EpicAPIError, EpicAsset};
+use crate::api::{EpicAPI, EpicAPIError, EpicAsset, AssetManifest, AssetInfo, GameToken, Entitlement, Library};
 use chrono::{Utc, DateTime};
+use std::future::Future;
+use std::collections::HashMap;
 
 
 pub struct EpicGames {
@@ -127,8 +129,50 @@ impl EpicGames {
 
     pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
         match self.egs.get_assets(None, None).await {
-            Ok(b) => { return b; }
-            Err(_) => { return Vec::new(); }
+            Ok(b) => { b }
+            Err(_) => { Vec::new() }
+        }
+    }
+
+    pub async fn get_asset_metadata(&mut self, asset: EpicAsset) -> Option<AssetManifest> {
+        match self.egs.get_asset_manifest(None, None, asset).await {
+            Ok(a) => { Some(a) }
+            Err(_) => { None }
+        }
+    }
+
+    pub async fn get_asset_info(&mut self, asset: EpicAsset) -> Option<HashMap<String, AssetInfo>> {
+        match self.egs.get_asset_info(asset).await {
+            Ok(a) => { Some(a) }
+            Err(_) => { None }
+        }
+    }
+
+    pub async fn get_game_token(&mut self) -> Option<GameToken> {
+        match self.egs.get_game_token().await {
+            Ok(a) => { Some(a) }
+            Err(_) => { None }
+        }
+    }
+
+    pub async fn get_ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
+        match self.egs.get_ownership_token(asset).await {
+            Ok(a) => { Some(a.token) }
+            Err(_) => { None }
+        }
+    }
+
+    pub async fn get_user_entitlements(&mut self) -> Vec<Entitlement> {
+        match self.egs.get_user_entitlements().await {
+            Ok(a) => { a }
+            Err(_) => { Vec::new() }
+        }
+    }
+
+    pub async fn get_library_items(&mut self, include_metadata: bool) -> Option<Library> {
+        match self.egs.get_library_items(include_metadata).await {
+            Ok(a) => { Some(a) }
+            Err(_) => { None }
         }
     }
 }
