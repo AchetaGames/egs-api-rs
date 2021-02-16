@@ -267,7 +267,6 @@ impl EpicAPI {
     }
 
     pub async fn start_session(&mut self, refresh_token: Option<String>, exchange_token: Option<String>) -> Result<bool, EpicAPIError> {
-        println!("{:016X}", EpicAPI::blob_to_num("215058166135082031144025".to_string()));
         let params = match refresh_token {
             None => {
                 match exchange_token {
