@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use reqwest::Url;
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EpicAsset {
@@ -13,11 +13,13 @@ pub struct EpicAsset {
     pub asset_id: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssetManifest {
     pub elements: Vec<Element>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Element {
@@ -28,6 +30,7 @@ pub struct Element {
     pub manifests: Vec<Manifest>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
@@ -35,12 +38,14 @@ pub struct Manifest {
     pub query_params: Vec<QueryParam>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueryParam {
     pub name: String,
     pub value: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
@@ -65,6 +70,7 @@ pub struct AssetInfo {
     pub unsearchable: bool,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyImage {
@@ -78,13 +84,14 @@ pub struct KeyImage {
     pub uploaded_date: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub path: String,
 }
 
-
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseInfo {
@@ -97,6 +104,7 @@ pub struct ReleaseInfo {
     pub version_title: Option<String>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameToken {
@@ -105,11 +113,13 @@ pub struct GameToken {
     pub creating_client_id: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OwnershipToken {
     pub token: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DownloadManifest {
@@ -135,6 +145,7 @@ pub struct DownloadManifest {
 }
 
 impl DownloadManifest {
+    /// Convert numbers in the Download Manifest from little indian and %03d concatenated string
     pub fn blob_to_num(str: String) -> u64 {
         let mut num: u64 = 0;
         let mut shift: u64 = 0;
@@ -147,6 +158,7 @@ impl DownloadManifest {
         return num;
     }
 
+    /// Get chunk dir based on the manifest version
     pub fn get_chunk_dir(version: u64) -> &'static str {
         if version >= 15 {
             "ChunksV4"
@@ -159,8 +171,9 @@ impl DownloadManifest {
         }
     }
 
+    /// Get the download links from the downloaded manifest
     pub fn get_download_links(&self, manifest_url: String) -> Vec<String> {
-        let mut url = manifest_url.split("/").collect::<Vec<&str>>().split_last().unwrap().1.join("/");
+        let url = manifest_url.split("/").collect::<Vec<&str>>().split_last().unwrap().1.join("/");
 
 
         let chunk_dir = DownloadManifest::get_chunk_dir(DownloadManifest::blob_to_num(self.manifest_file_version.to_string()));
@@ -177,6 +190,7 @@ impl DownloadManifest {
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct FileManifestList {
@@ -185,6 +199,7 @@ pub struct FileManifestList {
     pub file_chunk_parts: Vec<FileChunkPart>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct FileChunkPart {
@@ -193,6 +208,7 @@ pub struct FileChunkPart {
     pub size: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Entitlement {
@@ -216,6 +232,7 @@ pub struct Entitlement {
     pub country: Option<String>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Library {
@@ -223,6 +240,7 @@ pub struct Library {
     pub response_metadata: Option<ResponseMetadata>,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
@@ -233,6 +251,7 @@ pub struct Record {
     pub sandbox_name: String,
 }
 
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseMetadata {

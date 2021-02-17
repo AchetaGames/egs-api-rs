@@ -17,3 +17,4 @@ A minimal asynchronous interface to Epic Games Store
  - Get Game Token
  - Get Entitlements
  - Get Library Items
+ - Generate download links for chunks

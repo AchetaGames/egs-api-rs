@@ -1,12 +1,10 @@
-use std::collections::hash_map::{Entry, RandomState};
-use std::collections::HashMap;
 use std::io::{self};
 
 use webbrowser;
 
-use egs_api::api::types::{AssetInfo, AssetManifest, Entitlement, EpicAsset, Library, DownloadManifest};
+use egs_api::api::types::{EpicAsset};
 use egs_api::EpicGames;
-use egs_api::api::EpicAPIError;
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() {
@@ -59,7 +57,7 @@ async fn main() {
             println!("From that {} non unreal assets", non_ueasset_map.len());
 
             println!("Getting the asset metadata");
-            match egs.get_asset_metadata(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await {
+            match egs.get_asset_manifest(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await {
                 None => {}
                 Some(manifest) => {
                     for elem in manifest.elements {

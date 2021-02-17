@@ -10,8 +10,14 @@ use serde::{Deserialize, Serialize};
 
 use types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest, OwnershipToken};
 
+/// Module holding the API types
 pub mod types;
 
+
+/// Structure that holds all user data
+///
+/// Needed for login
+#[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserData {
     pub access_token: Option<String>,
@@ -38,6 +44,7 @@ pub struct UserData {
 
 
 impl UserData {
+    /// Updates only the present values in the existing user data
     pub fn update(&mut self, new: UserData) {
         if let Some(n) = new.access_token { self.access_token = Some(n) }
         if let Some(n) = new.expires_in { self.expires_in = Some(n) }
@@ -64,11 +71,16 @@ pub(crate) struct EpicAPI {
     pub(crate) user_data: UserData,
 }
 
+/// Error enum for the Epic API
 #[derive(Debug)]
 pub enum EpicAPIError {
+    /// Wrong credentials
     InvalidCredentials,
+    /// API error - see the contents
     APIError(String),
+    /// Unknown error
     Unknown,
+    /// Server error
     Server,
 }
 
@@ -162,10 +174,6 @@ impl EpicAPI {
 
     fn get_authorized_post_client(&self, url: &str) -> RequestBuilder {
         self.set_authorization_header(self.client.post(url))
-    }
-
-    fn get_authorized_delete_client(&self, url: &str) -> RequestBuilder {
-        self.set_authorization_header(self.client.delete(url))
     }
 
     fn set_authorization_header(&self, rb: RequestBuilder) -> RequestBuilder {

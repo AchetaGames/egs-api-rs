@@ -1,25 +1,47 @@
-use std::collections::HashMap;
+#![deny(missing_docs)]
+#![cfg_attr(test, deny(warnings))]
 
-use chrono::{DateTime, Utc};
+//! # Epic Games Store API
+//!
+//! A minimal asynchronous interface to Epic Games Store
+//!
+//! # This is under heavy development expect major breaking changes
+//!
+//! ## Current functionality
+//!  - Authentication
+//!  - Listing Assets
+//!  - Get Asset metadata
+//!  - Get Asset info
+//!  - Get Ownership Token
+//!  - Get Game Token
+//!  - Get Entitlements
+//!  - Get Library Items
+//!  - Generate download links for chunks
+
+use chrono;
 use reqwest::header;
 
 use api::types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest};
 
 use crate::api::{EpicAPI, EpicAPIError};
 
+/// Module for authenticated API communication
 pub mod api;
 
+/// Struct to manage the communication with the Epic Games Store Api
 pub struct EpicGames {
     egs: EpicAPI
 }
 
 impl EpicGames {
+    /// Creates new object
     pub fn new() -> Self {
         EpicGames {
             egs: EpicAPI::new()
         }
     }
 
+    /// Authenticate with sid
     pub async fn auth_sid(&self, sid: &str) -> Option<String> {
         // get first set of cookies (EPIC_BEARER_TOKEN etc.)
         let mut headers = header::HeaderMap::new();
@@ -69,6 +91,7 @@ impl EpicGames {
         }
     }
 
+    /// Start session with auth code
     pub async fn auth_code(&mut self, code: String) -> bool {
         match self.egs.start_session(None, Some(code)).await {
             Ok(b) => { return b; }
@@ -76,6 +99,7 @@ impl EpicGames {
         }
     }
 
+    /// Perform login based on previous authentication
     pub async fn login(&mut self) -> bool {
         match self.egs.user_data.expires_at {
             None => {}
@@ -106,7 +130,7 @@ impl EpicGames {
                 let now = chrono::offset::Utc::now();
                 let td = exp - now;
                 if td.num_seconds() > 600 {
-                    match &self.egs.user_data.refresh_token {
+                    match self.egs.user_data.refresh_token.clone() {
                         None => {}
                         Some(rt) => {
                             match self.egs.start_session(Some(rt.to_string()), None).await {
@@ -127,7 +151,7 @@ impl EpicGames {
         false
     }
 
-
+    /// Returns all assets
     pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
         match self.egs.get_assets(None, None).await {
             Ok(b) => { b }
@@ -135,20 +159,23 @@ impl EpicGames {
         }
     }
 
-    pub async fn get_asset_metadata(&mut self, asset: EpicAsset) -> Option<AssetManifest> {
+    /// Return asset
+    pub async fn get_asset_manifest(&mut self, asset: EpicAsset) -> Option<AssetManifest> {
         match self.egs.get_asset_manifest(None, None, asset).await {
             Ok(a) => { Some(a) }
             Err(_) => { None }
         }
     }
 
-    pub async fn get_asset_info(&mut self, asset: EpicAsset) -> Option<HashMap<String, AssetInfo>> {
-        match self.egs.get_asset_info(asset).await {
-            Ok(a) => { Some(a) }
+    /// Returns info for an asset
+    pub async fn get_asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
+        match self.egs.get_asset_info(asset.clone()).await {
+            Ok(mut a) => { a.remove(asset.catalog_item_id.as_str()) }
             Err(_) => { None }
         }
     }
 
+    /// Returns game token
     pub async fn get_game_token(&mut self) -> Option<GameToken> {
         match self.egs.get_game_token().await {
             Ok(a) => { Some(a) }
@@ -156,6 +183,7 @@ impl EpicGames {
         }
     }
 
+    /// Returns ownership token for an Asset
     pub async fn get_ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
         match self.egs.get_ownership_token(asset).await {
             Ok(a) => { Some(a.token) }
@@ -163,6 +191,7 @@ impl EpicGames {
         }
     }
 
+    ///Returns user entitlements
     pub async fn get_user_entitlements(&mut self) -> Vec<Entitlement> {
         match self.egs.get_user_entitlements().await {
             Ok(a) => { a }
@@ -170,6 +199,7 @@ impl EpicGames {
         }
     }
 
+    /// Returns the user library
     pub async fn get_library_items(&mut self, include_metadata: bool) -> Option<Library> {
         match self.egs.get_library_items(include_metadata).await {
             Ok(a) => { Some(a) }
@@ -177,6 +207,7 @@ impl EpicGames {
         }
     }
 
+    /// Returns a DownloadManifest for a specified file manifest
     pub async fn get_asset_download_manifest(&self, manifest: Manifest) -> Result<DownloadManifest, EpicAPIError> {
         match self.egs.get_asset_download_manifest(manifest).await {
             Ok(manifest) => Ok(manifest),
