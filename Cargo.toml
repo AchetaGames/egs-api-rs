@@ -1,13 +1,13 @@
 [package]
 name = "egs-api"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description  = "Interface to the Epic Games API"
 categories = ["asynchronous"]
 keywords = ["EpicGames", "Epic", "egs"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/aknarts/egs-api-rs"
+repository = "https://github.com/AchetaGames/egs-api-rs"
 documentation = "https://docs.rs/egs-api/latest/egs_api/"
 
 edition = "2018"
