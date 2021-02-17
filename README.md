@@ -1,3 +1,9 @@
+<p align="center">
+<a href="https://discord.gg/C2S8eGfZ6n">
+        <img src="https://img.shields.io/discord/308323056592486420?logo=discord"
+            alt="chat on Discord"></a>
+</p>
+
 # egs-api
 
 A minimal asynchronous interface to Epic Games Store
