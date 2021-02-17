@@ -8,6 +8,7 @@ keywords = ["EpicGames", "Epic", "egs"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/aknarts/egs-api-rs"
+documentation = "https://docs.rs/egs-api/latest/egs_api/"
 
 edition = "2018"
 
