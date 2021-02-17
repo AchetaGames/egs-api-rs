@@ -1,5 +1,5 @@
 <p align="center">
-<img alt="GitHub" src="https://img.shields.io/github/license/aknarts/egs-api-rs">
+<img alt="GitHub" src="https://img.shields.io/github/license/AchetaGames/egs-api-rs">
 <a href="https://crates.io/crates/egs-api">
     <img alt="Crates.io" src="https://img.shields.io/crates/v/egs-api"></a>
 <a href="https://docs.rs/egs-api/latest/egs_api/">
