@@ -7,6 +7,7 @@ categories = ["asynchronous"]
 keywords = ["Epic Games", "Epic", "egs"]
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/aknarts/egs-api-rs"
 
 edition = "2018"
 
