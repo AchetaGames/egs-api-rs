@@ -1,12 +1,13 @@
-use reqwest::{header};
-
-pub mod api;
-
-use crate::api::{EpicAPI, EpicAPIError, EpicAsset, AssetManifest, AssetInfo, GameToken, Entitlement, Library};
-use chrono::{Utc, DateTime};
-use std::future::Future;
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
+use reqwest::header;
+
+use api::types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest};
+
+use crate::api::{EpicAPI, EpicAPIError};
+
+pub mod api;
 
 pub struct EpicGames {
     egs: EpicAPI
@@ -173,6 +174,13 @@ impl EpicGames {
         match self.egs.get_library_items(include_metadata).await {
             Ok(a) => { Some(a) }
             Err(_) => { None }
+        }
+    }
+
+    pub async fn get_asset_download_manifest(&self, manifest: Manifest) -> Result<DownloadManifest, EpicAPIError> {
+        match self.egs.get_asset_download_manifest(manifest).await {
+            Ok(manifest) => Ok(manifest),
+            Err(e) => Err(e),
         }
     }
 }

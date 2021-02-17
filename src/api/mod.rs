@@ -1,12 +1,16 @@
-use reqwest::{Client, Response, RequestBuilder};
-use reqwest::header::HeaderMap;
-use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
+use std::borrow::BorrowMut;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::collections::HashMap;
-use std::borrow::BorrowMut;
-use std::num::ParseIntError;
+
+use chrono::{DateTime, Utc};
+use reqwest::{Client, RequestBuilder, Response};
+use reqwest::header::HeaderMap;
+use serde::{Deserialize, Serialize};
+
+use types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest, OwnershipToken};
+
+pub mod types;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserData {
@@ -32,17 +36,6 @@ pub struct UserData {
     pub error_code: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EpicAsset {
-    pub app_name: String,
-    pub label_name: String,
-    pub build_version: String,
-    pub catalog_item_id: String,
-    pub namespace: String,
-    pub asset_id: String,
-}
-
 
 impl UserData {
     pub fn update(&mut self, new: UserData) {
@@ -64,149 +57,6 @@ impl UserData {
         if let Some(n) = new.error_message { self.error_message = Some(n) }
         if let Some(n) = new.error_code { self.error_code = Some(n) }
     }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AssetManifest {
-    pub elements: Vec<Element>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Element {
-    pub app_name: String,
-    pub label_name: String,
-    pub build_version: String,
-    pub hash: String,
-    pub manifests: Vec<Manifest>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Manifest {
-    pub uri: String,
-    pub query_params: Vec<QueryParam>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct QueryParam {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetInfo {
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub long_description: String,
-    pub technical_details: String,
-    pub key_images: Vec<KeyImage>,
-    pub categories: Vec<Category>,
-    pub namespace: String,
-    pub status: String,
-    pub creation_date: String,
-    pub last_modified_date: String,
-    pub entitlement_name: String,
-    pub entitlement_type: String,
-    pub item_type: String,
-    pub release_info: Vec<ReleaseInfo>,
-    pub developer: String,
-    pub developer_id: String,
-    pub end_of_support: bool,
-    pub unsearchable: bool,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KeyImage {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub url: String,
-    pub md5: String,
-    pub width: i64,
-    pub height: i64,
-    pub size: i64,
-    pub uploaded_date: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Category {
-    pub path: String,
-}
-
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReleaseInfo {
-    pub id: Option<String>,
-    pub app_id: Option<String>,
-    pub compatible_apps: Vec<String>,
-    pub platform: Vec<String>,
-    pub date_added: Option<String>,
-    pub release_note: Option<String>,
-    pub version_title: Option<String>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GameToken {
-    pub expires_in_seconds: i64,
-    pub code: String,
-    pub creating_client_id: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OwnershipToken {
-    pub token: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Entitlement {
-    pub id: String,
-    pub entitlement_name: String,
-    pub namespace: String,
-    pub catalog_item_id: String,
-    pub account_id: String,
-    pub identity_id: String,
-    pub entitlement_type: String,
-    pub grant_date: String,
-    pub consumable: bool,
-    pub status: String,
-    pub active: bool,
-    pub use_count: i64,
-    pub created: String,
-    pub updated: String,
-    pub group_entitlement: bool,
-    pub original_use_count: Option<i64>,
-    pub platform_type: Option<String>,
-    pub country: Option<String>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Library {
-    pub records: Vec<Record>,
-    pub response_metadata: Option<ResponseMetadata>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Record {
-    pub app_name: String,
-    pub catalog_item_id: String,
-    pub namespace: String,
-    pub product_id: String,
-    pub sandbox_name: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResponseMetadata {
-    pub next_cursor: Option<String>,
 }
 
 pub(crate) struct EpicAPI {
@@ -252,18 +102,6 @@ impl EpicAPI {
             .default_headers(headers)
             .cookie_store(true).build().unwrap();
         EpicAPI { client, user_data: Default::default() }
-    }
-
-    pub fn blob_to_num(str: String) -> u64 {
-        let mut num: u64 = 0;
-        let mut shift: u64 = 0;
-        for i in (0..str.len()).step_by(3) {
-            if let Ok(n) = str[i..i + 3].parse::<u64>() {
-                num += n << shift;
-                shift += 8;
-            }
-        };
-        return num;
     }
 
     pub async fn start_session(&mut self, refresh_token: Option<String>, exchange_token: Option<String>) -> Result<bool, EpicAPIError> {
@@ -380,6 +218,35 @@ impl EpicAPI {
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
                           platform.unwrap_or("Windows".to_string()), asset.namespace, asset.catalog_item_id, asset.app_name, label.unwrap_or("Live".to_string()));
         match self.get_authorized_get_client(&url).send().await {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::OK {
+                    match response.json().await {
+                        Ok(manifest) => { Ok(manifest) }
+                        Err(e) => {
+                            println!("Error: {:?}", e);
+                            Err(EpicAPIError::Unknown)
+                        }
+                    }
+                } else {
+                    println!("{} result: {}", response.status(), response.text().await.unwrap());
+                    Err(EpicAPIError::Unknown)
+                }
+            }
+            Err(e) => {
+                println!("Error: {:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
+    pub async fn get_asset_download_manifest(&self, manifest: Manifest) -> Result<DownloadManifest, EpicAPIError> {
+        let mut queries: Vec<(String, String)> = Vec::new();
+        for query in manifest.query_params {
+            queries.push((query.name, query.value));
+        }
+        match self.get_authorized_get_client(&manifest.uri)
+            .query(&queries)
+            .send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json().await {

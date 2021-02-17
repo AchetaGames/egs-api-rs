@@ -1,9 +1,12 @@
-use webbrowser;
-use std::io::{self};
-use egs_api::EpicGames;
-use egs_api::api::{EpicAsset, AssetInfo, Entitlement, Library, AssetManifest};
+use std::collections::hash_map::{Entry, RandomState};
 use std::collections::HashMap;
-use std::collections::hash_map::{RandomState, Entry};
+use std::io::{self};
+
+use webbrowser;
+
+use egs_api::api::types::{AssetInfo, AssetManifest, Entitlement, EpicAsset, Library, DownloadManifest};
+use egs_api::EpicGames;
+use egs_api::api::EpicAPIError;
 
 #[tokio::main]
 async fn main() {
@@ -32,8 +35,7 @@ async fn main() {
                         ueasset_map.insert(asset.catalog_item_id.clone(), HashMap::new());
                     };
                     match ueasset_map.get_mut(&asset.catalog_item_id.clone()) {
-                        None => {
-                        }
+                        None => {}
                         Some(old) => {
                             old.insert(asset.app_name.clone(), asset.clone());
                         }
@@ -43,8 +45,7 @@ async fn main() {
                         non_ueasset_map.insert(asset.catalog_item_id.clone(), HashMap::new());
                     };
                     match non_ueasset_map.get_mut(&asset.catalog_item_id.clone()) {
-                        None => {
-                        }
+                        None => {}
                         Some(old) => {
                             old.insert(asset.app_name.clone(), asset.clone());
                         }
@@ -58,7 +59,23 @@ async fn main() {
             println!("From that {} non unreal assets", non_ueasset_map.len());
 
             println!("Getting the asset metadata");
-            egs.get_asset_metadata(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
+            match egs.get_asset_metadata(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await {
+                None => {}
+                Some(manifest) => {
+                    for elem in manifest.elements {
+                        for man in elem.manifests {
+                            match egs.get_asset_download_manifest(man.clone()).await {
+                                Ok(d) => {
+                                    println!("{:#?}", d.get_download_links(man.uri));
+                                    break;
+                                }
+                                Err(_) => {}
+                            };
+                        }
+                    }
+                }
+            }
+            ;
             println!("Getting the asset info");
             egs.get_asset_info(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
             println!("Getting ownership token");
