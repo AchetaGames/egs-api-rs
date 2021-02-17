@@ -1,6 +1,6 @@
 [package]
 name = "egs-api"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description  = "Interface to the Epic Games API"
 categories = ["asynchronous"]
