@@ -23,12 +23,13 @@ use reqwest::header;
 
 use api::types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest};
 
-use crate::api::{EpicAPI, EpicAPIError};
+use crate::api::{EpicAPI, EpicAPIError, UserData};
 
 /// Module for authenticated API communication
 pub mod api;
 
 /// Struct to manage the communication with the Epic Games Store Api
+#[derive(Default, Debug, Clone)]
 pub struct EpicGames {
     egs: EpicAPI
 }
@@ -39,6 +40,31 @@ impl EpicGames {
         EpicGames {
             egs: EpicAPI::new()
         }
+    }
+
+    /// Check whether the user is logged in
+    pub fn is_logged_in(&self) -> bool {
+        match self.egs.user_data.expires_at {
+            None => {}
+            Some(exp) => {
+                let now = chrono::offset::Utc::now();
+                let td = exp - now;
+                if td.num_seconds() > 600 {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// Get User details
+    pub fn user_details(&self) -> UserData {
+        self.egs.user_data.clone()
+    }
+
+    /// Update User Details
+    pub fn set_user_details(&mut self, user_details: UserData) {
+        self.egs.user_data.update(user_details);
     }
 
     /// Authenticate with sid
@@ -93,7 +119,7 @@ impl EpicGames {
 
     /// Start session with auth code
     pub async fn auth_code(&mut self, code: String) -> bool {
-        match self.egs.start_session(None, Some(code)).await {
+        match self.egs.start_session(Some(code)).await {
             Ok(b) => { return b; }
             Err(_) => { return false; }
         }
@@ -130,20 +156,15 @@ impl EpicGames {
                 let now = chrono::offset::Utc::now();
                 let td = exp - now;
                 if td.num_seconds() > 600 {
-                    match self.egs.user_data.refresh_token.clone() {
-                        None => {}
-                        Some(rt) => {
-                            match self.egs.start_session(Some(rt.to_string()), None).await {
-                                Ok(b) => {
-                                    if b {
-                                        println!("Logged in");
-                                        return true;
-                                    }
-                                    return false;
-                                }
-                                Err(e) => { println!("Error: {}", e) }
+                    match self.egs.start_session(None).await {
+                        Ok(b) => {
+                            if b {
+                                println!("Logged in");
+                                return true;
                             }
+                            return false;
                         }
+                        Err(e) => { println!("Error: {}", e) }
                     }
                 }
             }
