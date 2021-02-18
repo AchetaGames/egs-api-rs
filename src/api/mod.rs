@@ -20,11 +20,11 @@ pub mod types;
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserData {
-    pub access_token: Option<String>,
+    access_token: Option<String>,
     pub expires_in: Option<i64>,
     pub expires_at: Option<DateTime<Utc>>,
     pub token_type: Option<String>,
-    pub refresh_token: Option<String>,
+    refresh_token: Option<String>,
     pub refresh_expires: Option<i64>,
     pub refresh_expires_at: Option<DateTime<Utc>>,
     pub account_id: Option<String>,
@@ -66,6 +66,7 @@ impl UserData {
     }
 }
 
+#[derive(Default, Debug, Clone)]
 pub(crate) struct EpicAPI {
     client: Client,
     pub(crate) user_data: UserData,
@@ -116,15 +117,10 @@ impl EpicAPI {
         EpicAPI { client, user_data: Default::default() }
     }
 
-    pub async fn start_session(&mut self, refresh_token: Option<String>, exchange_token: Option<String>) -> Result<bool, EpicAPIError> {
-        let params = match refresh_token {
-            None => {
-                match exchange_token {
-                    None => { return Err(EpicAPIError::InvalidCredentials); }
-                    Some(exchange) => { [("grant_type".to_string(), "exchange_code".to_string()), ("exchange_code".to_string(), exchange), ("token_type".to_string(), "eg1".to_string())] }
-                }
-            }
-            Some(refresh) => { [("grant_type".to_string(), "refresh_token".to_string()), ("refresh_token".to_string(), refresh), ("token_type".to_string(), "eg1".to_string())] }
+    pub async fn start_session(&mut self, exchange_token: Option<String>) -> Result<bool, EpicAPIError> {
+        let params = match exchange_token {
+            None => { [("grant_type".to_string(), "refresh_token".to_string()), ("refresh_token".to_string(), self.user_data.refresh_token.clone().unwrap()), ("token_type".to_string(), "eg1".to_string())] }
+            Some(exchange) => { [("grant_type".to_string(), "exchange_code".to_string()), ("exchange_code".to_string(), exchange), ("token_type".to_string(), "eg1".to_string())] }
         };
 
         match self.client
@@ -169,11 +165,21 @@ impl EpicAPI {
     }
 
     fn get_authorized_get_client(&self, url: &str) -> RequestBuilder {
-        self.set_authorization_header(self.client.get(url))
+        let mut headers = HeaderMap::new();
+        headers.insert("User-Agent", "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit".parse().unwrap());
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .cookie_store(true).build().unwrap();
+        self.set_authorization_header(client.clone().get(url))
     }
 
     fn get_authorized_post_client(&self, url: &str) -> RequestBuilder {
-        self.set_authorization_header(self.client.post(url))
+        let mut headers = HeaderMap::new();
+        headers.insert("User-Agent", "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit".parse().unwrap());
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .cookie_store(true).build().unwrap();
+        self.set_authorization_header(client.clone().post(url))
     }
 
     fn set_authorization_header(&self, rb: RequestBuilder) -> RequestBuilder {
