@@ -172,22 +172,70 @@ impl DownloadManifest {
     }
 
     /// Get the download links from the downloaded manifest
-    pub fn get_download_links(&self, manifest_url: String) -> Vec<String> {
+    pub fn get_download_links(&self, manifest_url: String) -> HashMap<String, String> {
         let url = manifest_url.split("/").collect::<Vec<&str>>().split_last().unwrap().1.join("/");
 
 
         let chunk_dir = DownloadManifest::get_chunk_dir(DownloadManifest::blob_to_num(self.manifest_file_version.to_string()));
-        let mut result: Vec<String> = Vec::new();
+        let mut result: HashMap<String, String> = HashMap::new();
 
         for (guid, hash) in self.chunk_hash_list.clone() {
             let group_num = match self.data_group_list.get(&guid) {
                 None => { continue; }
                 Some(group) => { DownloadManifest::blob_to_num(group.to_string()) }
             };
-            result.push(format!("{} {}/{}/{:02}/{:016X}_{}.chunk", DownloadManifest::blob_to_num(self.chunk_filesize_list.get(&guid).unwrap().to_string()), url, chunk_dir, group_num, DownloadManifest::blob_to_num(hash), guid));
+            result.insert(guid.clone(), format!("{}/{}/{:02}/{:016X}_{}.chunk", url, chunk_dir, group_num, DownloadManifest::blob_to_num(hash), guid));
         }
         result
     }
+
+    /// Get list of files in the manifest
+    pub fn get_files(&self, manifest_url: Option<String>) -> HashMap<String, FileManifest> {
+        let mut result: HashMap<String, FileManifest> = HashMap::new();
+        let links = match manifest_url {
+            None => { HashMap::new() }
+            Some(url) => { self.get_download_links(url) }
+        };
+
+        for file in self.file_manifest_list.clone() {
+            result.insert(file.filename.clone(), FileManifest {
+                filename: file.filename,
+                file_hash: file.file_hash,
+                file_chunk_parts: {
+                    let mut temp: Vec<FileChunk> = Vec::new();
+                    for part in file.file_chunk_parts {
+                        temp.push(FileChunk {
+                            guid: part.guid.clone(),
+                            link: links.get(&part.guid).unwrap_or(&"".to_string()).to_string(),
+                            offset: DownloadManifest::blob_to_num(part.offset),
+                            size: DownloadManifest::blob_to_num(part.size),
+                        })
+                    }
+                    temp
+                },
+            });
+        };
+        return result;
+    }
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct FileManifest {
+    pub filename: String,
+    pub file_hash: String,
+    pub file_chunk_parts: Vec<FileChunk>,
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct FileChunk {
+    pub guid: String,
+    pub link: String,
+    pub offset: u64,
+    pub size: u64,
 }
 
 #[allow(missing_docs)]
