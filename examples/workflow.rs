@@ -61,10 +61,12 @@ async fn main() {
                 None => {}
                 Some(manifest) => {
                     for elem in manifest.elements {
+                        println!("{}", elem.app_name);
                         for man in elem.manifests {
+                            println!("{:?}", man);
                             match egs.get_asset_download_manifest(man.clone()).await {
                                 Ok(d) => {
-                                    println!("{:#?}", d.get_download_links(man.uri));
+                                    println!("{:#?}", d.get_files(Some(man.uri)));
                                     break;
                                 }
                                 Err(_) => {}
@@ -72,8 +74,7 @@ async fn main() {
                         }
                     }
                 }
-            }
-            ;
+            };
             println!("Getting the asset info");
             egs.get_asset_info(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
             println!("Getting ownership token");
