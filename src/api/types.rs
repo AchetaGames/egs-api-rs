@@ -123,6 +123,7 @@ pub struct OwnershipToken {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DownloadManifest {
+    pub base_url: Option<String>,
     pub manifest_file_version: String,
     #[serde(rename = "bIsFileData")]
     pub b_is_file_data: bool,
@@ -172,9 +173,11 @@ impl DownloadManifest {
     }
 
     /// Get the download links from the downloaded manifest
-    pub fn get_download_links(&self, manifest_url: String) -> HashMap<String, String> {
-        let url = manifest_url.split("/").collect::<Vec<&str>>().split_last().unwrap().1.join("/");
-
+    pub fn get_download_links(&self) -> HashMap<String, String> {
+        let url = match self.base_url.clone() {
+            None => { "".to_string() }
+            Some(uri) => { uri }
+        };
 
         let chunk_dir = DownloadManifest::get_chunk_dir(DownloadManifest::blob_to_num(self.manifest_file_version.to_string()));
         let mut result: HashMap<String, String> = HashMap::new();
@@ -190,11 +193,11 @@ impl DownloadManifest {
     }
 
     /// Get list of files in the manifest
-    pub fn get_files(&self, manifest_url: Option<String>) -> HashMap<String, FileManifest> {
+    pub fn get_files(&self) -> HashMap<String, FileManifest> {
         let mut result: HashMap<String, FileManifest> = HashMap::new();
-        let links = match manifest_url {
+        let links = match self.base_url.clone() {
             None => { HashMap::new() }
-            Some(url) => { self.get_download_links(url) }
+            Some(_) => { self.get_download_links() }
         };
 
         for file in self.file_manifest_list.clone() {

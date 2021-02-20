@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gtk::{prelude::BuilderExtManual, Builder, Button, ButtonExt, Entry, EntryExt, Inhibit, Label, LabelExt, WidgetExt, Window, Stack, StackExt, GtkWindowExt, Box, ContainerExt, Expander, ExpanderBuilder, Image, ImageExt, Align, Separator};
+use gtk::{prelude::BuilderExtManual, Builder, Button, ButtonExt, Entry, EntryExt, Inhibit, Label, LabelExt, WidgetExt, Window, Stack, StackExt, GtkWindowExt, Box, ContainerExt, Expander, ExpanderExt, ExpanderBuilder, Image, ImageExt, Align, Separator};
 use relm_derive::Msg;
 use relm::{connect, Relm, Update, Widget, WidgetTest, Channel};
 use webbrowser;
@@ -27,16 +27,18 @@ use egs_api::EpicGames;
 use tokio::runtime::Runtime;
 use gtk::Orientation::{Vertical, Horizontal};
 use std::collections::HashMap;
-use egs_api::api::types::{EpicAsset, AssetInfo};
+use egs_api::api::types::{EpicAsset, AssetInfo, DownloadManifest};
 use gdk_pixbuf::PixbufLoaderExt;
 use std::thread;
-use crate::Msg::{LoginOk, ProcessAssetList, ProcessAssetInfo, ProcessImage};
+use crate::Msg::{LoginOk, ProcessAssetList, ProcessAssetInfo, ProcessImage, ProcessDownloadManifest};
 use egs_api::api::UserData;
 use threadpool::ThreadPool;
 
 
 struct Model {
     relm: Relm<Win>,
+    assets: HashMap<String, EpicAsset>,
+    download_manifests: HashMap<String, DownloadManifest>,
 }
 
 #[derive(Msg)]
@@ -47,6 +49,8 @@ enum Msg {
     ProcessAssetList(HashMap<String, HashMap<String, EpicAsset>>),
     ProcessAssetInfo(AssetInfo),
     ProcessImage((String, Vec<u8>)),
+    LoadDownloadManifest(String),
+    ProcessDownloadManifest(String, DownloadManifest),
     Quit,
 }
 
@@ -63,6 +67,7 @@ struct Widgets {
     asset_namespaces: HashMap<String, Expander>,
     asset_boxes: HashMap<String, Box>,
     asset_thumbnails: HashMap<String, Image>,
+    asset_files: HashMap<String, Box>,
 }
 
 struct Win {
@@ -82,6 +87,8 @@ impl Update for Win {
     fn model(relm: &Relm<Self>, _: ()) -> Model {
         Model {
             relm: relm.clone(),
+            assets: HashMap::new(),
+            download_manifests: HashMap::new(),
         }
     }
 
@@ -142,7 +149,8 @@ impl Update for Win {
                 for (namespace, filtered_assets) in asset_map {
                     println!("Adding namespace: {}", namespace);
                     let assets_box = Box::new(Vertical, 0);
-                    for (_id, a) in filtered_assets.clone() {
+                    for (id, a) in filtered_assets.clone() {
+                        self.model.assets.insert(id, a.clone());
                         let asset_box = Box::new(Vertical, 0);
 
                         assets_box.add(&asset_box);
@@ -174,6 +182,7 @@ impl Update for Win {
                     });
                     assets_box.show_all();
                     let category = ExpanderBuilder::new().label(&format!("{} ({})", namespace, filtered_assets.keys().len())).child(&assets_box).build();
+                    category.set_property_expand(true);
                     &self.widgets.assets_main_box.add(&gtk::Separator::new(Horizontal));
                     &self.widgets.assets_main_box.add(&category);
                     &self.widgets.asset_namespaces.insert(namespace, category);
@@ -186,6 +195,7 @@ impl Update for Win {
                 name.set_halign(Align::Start);
                 name.set_markup(format!("<b>{}</b>", glib::markup_escape_text(&asset.title)).as_str());
                 asset_box.add(&name);
+                asset_box.set_margin_start(20);
                 let details_box = Box::new(Horizontal, 5);
                 let gtkimage = Image::new();
                 gtkimage.set_margin_start(20);
@@ -198,11 +208,12 @@ impl Update for Win {
                 description.set_halign(Align::Start);
                 description.set_markup(format!("{}", glib::markup_escape_text(&asset.description)).as_str());
                 description.set_property_wrap(true);
+                info_box.set_property_expand(true);
                 info_box.add(&description);
                 details_box.add(&info_box);
                 self.widgets.asset_thumbnails.insert(asset.id.clone(), gtkimage);
 
-                for image in asset.key_images {
+                for image in asset.key_images.clone() {
                     if image.type_field.eq_ignore_ascii_case("Thumbnail") {
                         println!("{}: {}", image.type_field, image.url);
 
@@ -227,9 +238,21 @@ impl Update for Win {
                         });
                     }
                 }
+                let download_button: Button = Button::new();
+                download_button.set_label("Download");
+                details_box.add(&download_button);
                 details_box.show_all();
+                details_box.set_property_expand(true);
                 asset_box.add(&details_box);
+                let file_expander = ExpanderBuilder::new().label("File list").build();
+                let file_box: Box = Box::new(Vertical, 0);
+                file_expander.add(&file_box);
+
+                self.widgets.asset_files.insert(asset.id.clone(), file_box);
+                asset_box.add(&file_expander);
+                asset_box.set_property_expand(true);
                 asset_box.show_all();
+                connect!(self.model.relm, file_expander,connect_property_expanded_notify(_), Msg::LoadDownloadManifest(asset.id.clone()));
             }
             Msg::ProcessImage((id, b)) => {
                 match self.widgets.asset_thumbnails.get(&id) {
@@ -241,6 +264,60 @@ impl Update for Win {
                         gtkimage.set_from_pixbuf(pixbuf_loader.get_pixbuf().unwrap().scale_simple(60, 60, gdk_pixbuf::InterpType::Bilinear).as_ref());
                     }
                 }
+            }
+            Msg::LoadDownloadManifest(id) => {
+                let asset = match self.model.assets.get(id.as_str())
+                {
+                    None => { return; }
+                    Some(a) => { a.clone() }
+                };
+
+                if let Some(_) = self.model.download_manifests.get(id.as_str()) { return; }
+                let stream = self.model.relm.stream().clone();
+                let (_channel, sender) = Channel::new(move |dm| {
+                    stream.emit(ProcessDownloadManifest(id.clone(), dm));
+                });
+
+                let mut eg = self.epic_games.clone();
+                thread::spawn(move || {
+                    match Runtime::new().unwrap().block_on(eg.get_asset_manifest(asset)) {
+                        None => {}
+                        Some(manifest) => {
+                            for elem in manifest.elements {
+                                for man in elem.manifests {
+                                    match Runtime::new().unwrap().block_on(eg.get_asset_download_manifest(man.clone())) {
+                                        Ok(d) => {
+                                            sender.send(d).unwrap();
+                                            break;
+                                        }
+                                        Err(_) => {}
+                                    };
+                                }
+                            }
+                        }
+                    };
+                });
+            }
+            ProcessDownloadManifest(id, dm) => {
+                self.model.download_manifests.insert(id.clone(), dm.clone());
+                let file_list = match self.widgets.asset_files.get(id.as_str()) {
+                    None => { return; }
+                    Some(fl) => { fl }
+                };
+                for (file, _info) in dm.get_files() {
+                    let file_box = Box::new(Horizontal, 0);
+                    let label = Label::new(Some(&file));
+                    label.set_halign(Align::Start);
+                    label.set_ellipsize(pango::EllipsizeMode::Middle);
+                    label.set_property_expand(true);
+                    file_box.add(&label);
+                    let download_button: Button = Button::new();
+                    download_button.set_label("Download");
+                    file_box.add(&download_button);
+                    file_box.show_all();
+                    file_list.add(&file_box);
+                }
+                file_list.show_all();
             }
         }
     }
@@ -286,6 +363,7 @@ impl Widget for Win {
                 asset_namespaces: Default::default(),
                 asset_boxes: Default::default(),
                 asset_thumbnails: Default::default(),
+                asset_files: Default::default(),
             },
             epic_games: EpicGames::new(),
         }
