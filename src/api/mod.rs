@@ -263,8 +263,11 @@ impl EpicAPI {
             .send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(manifest) => { Ok(manifest) }
+                    match response.json::<DownloadManifest>().await {
+                        Ok(mut man) => {
+                            man.base_url = Some(manifest.uri.split("/").collect::<Vec<&str>>().split_last().unwrap().1.join("/"));
+                            Ok(man)
+                        }
                         Err(e) => {
                             println!("Error: {:?}", e);
                             Err(EpicAPIError::Unknown)
