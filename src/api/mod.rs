@@ -111,9 +111,7 @@ impl EpicAPI {
     pub fn new() -> Self {
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit".parse().unwrap());
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .cookie_store(true).build().unwrap();
+        let client = reqwest::Client::builder().default_headers(headers).cookie_store(true).build().unwrap();
         EpicAPI { client, user_data: Default::default() }
     }
 
@@ -123,11 +121,7 @@ impl EpicAPI {
             Some(exchange) => { [("grant_type".to_string(), "exchange_code".to_string()), ("exchange_code".to_string(), exchange), ("token_type".to_string(), "eg1".to_string())] }
         };
 
-        match self.client
-            .post("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
-            .form(&params)
-            .basic_auth("34a02cf8f4414e29b15921876da36f9a", Some("daafbccc737745039dffe53d94fc76cf"))
-            .send().await {
+        match self.client.post("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token").form(&params).basic_auth("34a02cf8f4414e29b15921876da36f9a", Some("daafbccc737745039dffe53d94fc76cf")).send().await {
             Ok(response) => {
                 return self.handle_login_response(response).await;
             }
@@ -167,18 +161,14 @@ impl EpicAPI {
     fn get_authorized_get_client(&self, url: &str) -> RequestBuilder {
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit".parse().unwrap());
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .cookie_store(true).build().unwrap();
+        let client = reqwest::Client::builder().default_headers(headers).cookie_store(true).build().unwrap();
         self.set_authorization_header(client.clone().get(url))
     }
 
     fn get_authorized_post_client(&self, url: &str) -> RequestBuilder {
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit".parse().unwrap());
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .cookie_store(true).build().unwrap();
+        let client = reqwest::Client::builder().default_headers(headers).cookie_store(true).build().unwrap();
         self.set_authorization_header(client.clone().post(url))
     }
 
@@ -187,9 +177,7 @@ impl EpicAPI {
     }
 
     pub async fn resume_session(&mut self) -> Result<bool, EpicAPIError> {
-        match self.get_authorized_get_client("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify")
-            .send()
-            .await {
+        match self.get_authorized_get_client("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify").send().await {
             Ok(response) => {
                 return self.handle_login_response(response).await;
             }
@@ -204,9 +192,7 @@ impl EpicAPI {
         let plat = platform.unwrap_or("Windows".to_string());
         let lab = label.unwrap_or("Live".to_string());
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/{}?label={}", plat, lab);
-        match self.get_authorized_get_client(&url)
-            .send()
-            .await {
+        match self.get_authorized_get_client(&url).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json().await {
@@ -258,9 +244,7 @@ impl EpicAPI {
         for query in manifest.query_params {
             queries.push((query.name, query.value));
         }
-        match self.get_authorized_get_client(&manifest.uri)
-            .query(&queries)
-            .send().await {
+        match self.get_authorized_get_client(&manifest.uri).query(&queries).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json::<DownloadManifest>().await {
@@ -291,6 +275,11 @@ impl EpicAPI {
         match self.get_authorized_get_client(&url).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
+                    // match response.text().await {
+                    //     Ok(t) => { println!("4321574 {},", t); }
+                    //     Err(_) => {}
+                    // }
+
                     match response.json().await {
                         Ok(info) => { Ok(info) }
                         Err(e) => {
@@ -342,9 +331,7 @@ impl EpicAPI {
                         id)
             }
         };
-        match self.get_authorized_post_client(&url)
-            .form(&[("nsCatalogItemId".to_string(), format!("{}:{}", asset.namespace, asset.catalog_item_id))])
-            .send().await {
+        match self.get_authorized_post_client(&url).form(&[("nsCatalogItemId".to_string(), format!("{}:{}", asset.namespace, asset.catalog_item_id))]).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json().await {
@@ -409,9 +396,7 @@ impl EpicAPI {
                 }
             };
 
-            match self.get_authorized_get_client(&url)
-                .send()
-                .await {
+            match self.get_authorized_get_client(&url).send().await {
                 Ok(response) => {
                     if response.status() == reqwest::StatusCode::OK {
                         match response.json::<Library>().await {
