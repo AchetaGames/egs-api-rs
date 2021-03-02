@@ -259,7 +259,7 @@ impl Update for Win {
 
                 let mut eg = self.epic_games.clone();
                 thread::spawn(move || {
-                    match Runtime::new().unwrap().block_on(eg.get_asset_manifest(asset)) {
+                    match Runtime::new().unwrap().block_on(eg.get_asset_manifest(None, None, None, asset)) {
                         None => {}
                         Some(manifest) => {
                             for elem in manifest.elements {

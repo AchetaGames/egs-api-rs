@@ -2,9 +2,10 @@ use std::io::{self};
 
 use webbrowser;
 
-use egs_api::api::types::{EpicAsset};
+use egs_api::api::types::{EpicAsset, AssetInfo};
 use egs_api::EpicGames;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
 
 #[tokio::main]
 async fn main() {
@@ -57,26 +58,26 @@ async fn main() {
             println!("From that {} non unreal assets", non_ueasset_map.len());
 
             println!("Getting the asset metadata");
-            match egs.get_asset_manifest(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await {
-                None => {}
-                Some(manifest) => {
-                    for elem in manifest.elements {
-                        println!("{}", elem.app_name);
-                        for man in elem.manifests {
-                            println!("{:?}", man);
-                            match egs.get_asset_download_manifest(man.clone()).await {
-                                Ok(d) => {
-                                    println!("{:#?}", d.get_files(Some(man.uri)));
-                                    break;
-                                }
-                                Err(_) => {}
-                            };
+            egs.get_asset_manifest(None,None, None,ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
+            println!("Getting the asset info");
+            let mut categories: HashSet<String> = HashSet::new();
+            for (guid, asset) in non_ueasset_map.clone() {
+                match egs.get_asset_info(asset.values().last().unwrap().to_owned()).await
+                {
+                    None => {}
+                    Some(info) => {
+                        for category in info.categories {
+                            categories.insert(category.path);
                         }
                     }
-                }
-            };
-            println!("Getting the asset info");
-            egs.get_asset_info(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
+                };
+            }
+            let mut cat: Vec<String> =categories.into_iter().collect();
+            cat.sort();
+            for category in cat {
+                println!("{}", category);
+            }
+            println!("{:#?}", egs.get_asset_info(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await);
             println!("Getting ownership token");
             egs.get_ownership_token(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
             println!("Getting the game token");

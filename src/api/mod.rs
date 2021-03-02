@@ -228,9 +228,9 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_asset_manifest(&self, platform: Option<String>, label: Option<String>, asset: EpicAsset) -> Result<AssetManifest, EpicAPIError> {
+    pub async fn get_asset_manifest(&self, platform: Option<String>, label: Option<String>, app: Option<String>, asset: EpicAsset) -> Result<AssetManifest, EpicAPIError> {
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.unwrap_or("Windows".to_string()), asset.namespace, asset.catalog_item_id, asset.app_name, label.unwrap_or("Live".to_string()));
+                          platform.unwrap_or("Windows".to_string()), asset.namespace, asset.catalog_item_id, app.unwrap_or(asset.app_name), label.unwrap_or("Live".to_string()));
         match self.get_authorized_get_client(&url).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
