@@ -48,26 +48,48 @@ pub struct QueryParam {
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Root {
+    #[serde(rename = "asset_info")]
+    pub asset_info: AssetInfo,
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
     pub id: String,
-    pub title: String,
-    pub description: String,
-    pub long_description: Option<String>,
-    pub technical_details: Option<String>,
-    pub key_images: Vec<KeyImage>,
-    pub categories: Vec<Category>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub key_images: Option<Vec<KeyImage>>,
+    pub categories: Option<Vec<Category>>,
     pub namespace: String,
-    pub status: String,
-    pub creation_date: String,
-    pub last_modified_date: String,
-    pub entitlement_name: String,
-    pub entitlement_type: String,
-    pub item_type: String,
-    pub release_info: Vec<ReleaseInfo>,
-    pub developer: String,
-    pub developer_id: String,
-    pub end_of_support: bool,
+    pub status: Option<String>,
+    pub creation_date: Option<String>,
+    pub last_modified_date: Option<String>,
+    pub custom_attributes: Option<HashMap<String, CustomAttribute>>,
+    pub entitlement_name: Option<String>,
+    pub entitlement_type: Option<String>,
+    pub item_type: Option<String>,
+    pub release_info: Option<Vec<ReleaseInfo>>,
+    pub developer: Option<String>,
+    pub developer_id: Option<String>,
+    #[serde(default)]
+    pub eula_ids: Vec<String>,
+    pub end_of_support: Option<bool>,
+    #[serde(default)]
+    pub dlc_item_list: Vec<AssetInfo>,
+    pub age_gatings: Option<::serde_json::Value>,
+    pub application_id: Option<String>,
     pub unsearchable: bool,
+    pub self_refundable: Option<bool>,
+    pub requires_secure_account: Option<bool>,
+    pub long_description: Option<String>,
+    pub main_game_item: Box<Option<AssetInfo>>,
+    pub esrb_game_rating_value: Option<String>,
+    pub use_count: Option<i64>,
+    pub technical_details: Option<String>,
+    #[serde(default)]
+    pub install_modes: Vec<::serde_json::Value>,
 }
 
 #[allow(missing_docs)]
@@ -89,6 +111,15 @@ pub struct KeyImage {
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub path: String,
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomAttribute {
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub value: String,
 }
 
 #[allow(missing_docs)]

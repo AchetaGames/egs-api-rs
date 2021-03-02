@@ -172,7 +172,7 @@ impl Update for Win {
                 let asset_box = self.widgets.asset_boxes.get(asset.id.as_str()).unwrap();
                 let name = Label::new(None);
                 name.set_halign(Align::Start);
-                name.set_markup(format!("<b>{}</b>", glib::markup_escape_text(&asset.title)).as_str());
+                name.set_markup(format!("<b>{}</b>", glib::markup_escape_text(&asset.title.clone().unwrap_or("".to_string()))).as_str());
                 asset_box.add(&name);
                 asset_box.set_margin_start(20);
                 let details_box = Box::new(Horizontal, 5);
@@ -180,19 +180,19 @@ impl Update for Win {
                 gtkimage.set_margin_start(20);
                 details_box.add(&gtkimage);
                 let info_box = Box::new(Vertical, 0);
-                let developer = Label::new(Some(format!("Developer: {}", &asset.developer).as_str()));
+                let developer = Label::new(Some(format!("Developer: {}", &asset.developer.clone().unwrap_or("".into())).as_str()));
                 developer.set_halign(Align::Start);
                 info_box.add(&developer);
                 let description = Label::new(None);
                 description.set_halign(Align::Start);
-                description.set_markup(format!("{}", glib::markup_escape_text(&asset.description)).as_str());
+                description.set_markup(format!("{}", glib::markup_escape_text(&asset.description.clone().unwrap_or("".into()))).as_str());
                 description.set_property_wrap(true);
                 info_box.set_property_expand(true);
                 info_box.add(&description);
                 details_box.add(&info_box);
                 self.widgets.asset_thumbnails.insert(asset.id.clone(), gtkimage);
 
-                for image in asset.key_images.clone() {
+                for image in asset.key_images.clone().unwrap() {
                     if image.type_field.eq_ignore_ascii_case("Thumbnail") {
                         println!("{}: {}", image.type_field, image.url);
 

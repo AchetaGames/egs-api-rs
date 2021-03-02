@@ -52,7 +52,6 @@ async fn main() {
                 }
             }
 
-
             println!("Got {} assets", ueasset_map.len() + non_ueasset_map.len());
             println!("From that {} unreal assets", ueasset_map.len());
             println!("From that {} non unreal assets", non_ueasset_map.len());
@@ -66,7 +65,7 @@ async fn main() {
                 {
                     None => {}
                     Some(info) => {
-                        for category in info.categories {
+                        for category in info.categories.unwrap() {
                             categories.insert(category.path);
                         }
                     }
