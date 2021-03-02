@@ -50,11 +50,11 @@ impl EpicGames {
                 let now = chrono::offset::Utc::now();
                 let td = exp - now;
                 if td.num_seconds() > 600 {
-                    return true
+                    return true;
                 }
             }
         }
-        return false
+        return false;
     }
 
     /// Get User details
@@ -77,10 +77,7 @@ impl EpicGames {
         headers.insert("X-Requested-With", "XMLHttpRequest".parse().unwrap());
         headers.insert("User-Agent", "EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live ".parse().unwrap());
         let url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
-        let client = reqwest::Client::builder()
-            .cookie_store(true)
-            .default_headers(headers)
-            .build().unwrap();
+        let client = reqwest::Client::builder().cookie_store(true).default_headers(headers).build().unwrap();
         match client.get(&url).send().await {
             Ok(_resp) => {}
             _ => {}
@@ -181,8 +178,8 @@ impl EpicGames {
     }
 
     /// Return asset
-    pub async fn get_asset_manifest(&mut self, asset: EpicAsset) -> Option<AssetManifest> {
-        match self.egs.get_asset_manifest(None, None, asset).await {
+    pub async fn get_asset_manifest(&mut self, platform: Option<String>, label: Option<String>, app: Option<String>, asset: EpicAsset) -> Option<AssetManifest> {
+        match self.egs.get_asset_manifest(platform, label, app, asset).await {
             Ok(a) => { Some(a) }
             Err(_) => { None }
         }
