@@ -1,5 +1,7 @@
-use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use url::Url;
 
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,10 +33,10 @@ pub struct Element {
 }
 
 #[allow(missing_docs)]
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
-    pub uri: String,
+    pub uri: Url,
     pub query_params: Vec<QueryParam>,
 }
 
@@ -64,8 +66,8 @@ pub struct AssetInfo {
     pub categories: Option<Vec<Category>>,
     pub namespace: String,
     pub status: Option<String>,
-    pub creation_date: Option<String>,
-    pub last_modified_date: Option<String>,
+    pub creation_date: Option<DateTime<Utc>>,
+    pub last_modified_date: Option<DateTime<Utc>>,
     pub custom_attributes: Option<HashMap<String, CustomAttribute>>,
     pub entitlement_name: Option<String>,
     pub entitlement_type: Option<String>,
@@ -93,17 +95,17 @@ pub struct AssetInfo {
 }
 
 #[allow(missing_docs)]
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyImage {
     #[serde(rename = "type")]
     pub type_field: String,
-    pub url: String,
+    pub url: Url,
     pub md5: String,
     pub width: i64,
     pub height: i64,
     pub size: i64,
-    pub uploaded_date: String,
+    pub uploaded_date: DateTime<Utc>,
 }
 
 #[allow(missing_docs)]
@@ -130,7 +132,7 @@ pub struct ReleaseInfo {
     pub app_id: Option<String>,
     pub compatible_apps: Option<Vec<String>>,
     pub platform: Vec<String>,
-    pub date_added: Option<String>,
+    pub date_added: Option<DateTime<Utc>>,
     pub release_note: Option<String>,
     pub version_title: Option<String>,
 }
@@ -154,7 +156,7 @@ pub struct OwnershipToken {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DownloadManifest {
-    pub base_url: Option<String>,
+    pub base_url: Option<Url>,
     pub manifest_file_version: String,
     #[serde(rename = "bIsFileData")]
     pub b_is_file_data: bool,
@@ -186,12 +188,12 @@ impl DownloadManifest {
                 num += n << shift;
                 shift += 8;
             }
-        };
+        }
         return num;
     }
 
     /// Get chunk dir based on the manifest version
-    pub fn get_chunk_dir(version: u64) -> &'static str {
+    fn get_chunk_dir(version: u64) -> &'static str {
         if version >= 15 {
             "ChunksV4"
         } else if version >= 6 {
@@ -204,21 +206,38 @@ impl DownloadManifest {
     }
 
     /// Get the download links from the downloaded manifest
-    pub fn get_download_links(&self) -> HashMap<String, String> {
+    fn get_download_links(&self) -> HashMap<String, Url> {
         let url = match self.base_url.clone() {
-            None => { "".to_string() }
-            Some(uri) => { uri }
+            None => {
+                return HashMap::new();
+            }
+            Some(uri) => uri,
         };
 
-        let chunk_dir = DownloadManifest::get_chunk_dir(DownloadManifest::blob_to_num(self.manifest_file_version.to_string()));
-        let mut result: HashMap<String, String> = HashMap::new();
+        let chunk_dir = DownloadManifest::get_chunk_dir(DownloadManifest::blob_to_num(
+            self.manifest_file_version.to_string(),
+        ));
+        let mut result: HashMap<String, Url> = HashMap::new();
 
         for (guid, hash) in self.chunk_hash_list.clone() {
             let group_num = match self.data_group_list.get(&guid) {
-                None => { continue; }
-                Some(group) => { DownloadManifest::blob_to_num(group.to_string()) }
+                None => {
+                    continue;
+                }
+                Some(group) => DownloadManifest::blob_to_num(group.to_string()),
             };
-            result.insert(guid.clone(), format!("{}/{}/{:02}/{:016X}_{}.chunk", url, chunk_dir, group_num, DownloadManifest::blob_to_num(hash), guid));
+            result.insert(
+                guid.clone(),
+                Url::parse(&format!(
+                    "{}/{}/{:02}/{:016X}_{}.chunk",
+                    url.as_str(),
+                    chunk_dir,
+                    group_num,
+                    DownloadManifest::blob_to_num(hash),
+                    guid
+                ))
+                .unwrap(),
+            );
         }
         result
     }
@@ -227,28 +246,36 @@ impl DownloadManifest {
     pub fn get_files(&self) -> HashMap<String, FileManifest> {
         let mut result: HashMap<String, FileManifest> = HashMap::new();
         let links = match self.base_url.clone() {
-            None => { HashMap::new() }
-            Some(_) => { self.get_download_links() }
+            None => HashMap::new(),
+            Some(_) => self.get_download_links(),
         };
 
         for file in self.file_manifest_list.clone() {
-            result.insert(file.filename.clone(), FileManifest {
-                filename: file.filename,
-                file_hash: file.file_hash,
-                file_chunk_parts: {
-                    let mut temp: Vec<FileChunk> = Vec::new();
-                    for part in file.file_chunk_parts {
-                        temp.push(FileChunk {
-                            guid: part.guid.clone(),
-                            link: links.get(&part.guid).unwrap_or(&"".to_string()).to_string(),
-                            offset: DownloadManifest::blob_to_num(part.offset),
-                            size: DownloadManifest::blob_to_num(part.size),
-                        })
-                    }
-                    temp
+            result.insert(
+                file.filename.clone(),
+                FileManifest {
+                    filename: file.filename,
+                    file_hash: file.file_hash,
+                    file_chunk_parts: {
+                        let mut temp: Vec<FileChunk> = Vec::new();
+                        for part in file.file_chunk_parts {
+                            temp.push(FileChunk {
+                                guid: part.guid.clone(),
+                                link: match links.get(&part.guid) {
+                                    None => {
+                                        continue;
+                                    }
+                                    Some(u) => u.clone(),
+                                },
+                                offset: DownloadManifest::blob_to_num(part.offset),
+                                size: DownloadManifest::blob_to_num(part.size),
+                            })
+                        }
+                        temp
+                    },
                 },
-            });
-        };
+            );
+        }
         return result;
     }
 }
@@ -263,11 +290,11 @@ pub struct FileManifest {
 }
 
 #[allow(missing_docs)]
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct FileChunk {
     pub guid: String,
-    pub link: String,
+    pub link: Url,
     pub offset: u64,
     pub size: u64,
 }

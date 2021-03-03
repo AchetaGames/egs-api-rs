@@ -2,10 +2,9 @@ use std::io::{self};
 
 use webbrowser;
 
-use egs_api::api::types::{EpicAsset, AssetInfo};
+use egs_api::api::types::EpicAsset;
 use egs_api::EpicGames;
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +20,9 @@ async fn main() {
     let mut egs = EpicGames::new();
 
     match egs.auth_sid(sid.as_str()).await {
-        None => { println!("No exchange token, cannot login.") }
+        None => {
+            println!("No exchange token, cannot login.")
+        }
         Some(exchange_token) => {
             egs.auth_code(exchange_token).await;
             egs.login().await;
@@ -57,11 +58,26 @@ async fn main() {
             println!("From that {} non unreal assets", non_ueasset_map.len());
 
             println!("Getting the asset metadata");
-            egs.get_asset_manifest(None,None, None,ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
+            egs.get_asset_manifest(
+                None,
+                None,
+                None,
+                ueasset_map
+                    .values()
+                    .last()
+                    .unwrap()
+                    .values()
+                    .last()
+                    .unwrap()
+                    .to_owned(),
+            )
+            .await;
             println!("Getting the asset info");
             let mut categories: HashSet<String> = HashSet::new();
-            for (guid, asset) in non_ueasset_map.clone() {
-                match egs.get_asset_info(asset.values().last().unwrap().to_owned()).await
+            for (_guid, asset) in non_ueasset_map.clone() {
+                match egs
+                    .get_asset_info(asset.values().last().unwrap().to_owned())
+                    .await
                 {
                     None => {}
                     Some(info) => {
@@ -71,20 +87,69 @@ async fn main() {
                     }
                 };
             }
-            let mut cat: Vec<String> =categories.into_iter().collect();
+            let mut cat: Vec<String> = categories.into_iter().collect();
             cat.sort();
             for category in cat {
                 println!("{}", category);
             }
-            println!("{:#?}", egs.get_asset_info(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await);
+            println!(
+                "{:#?}",
+                egs.get_asset_info(
+                    ueasset_map
+                        .values()
+                        .last()
+                        .unwrap()
+                        .values()
+                        .last()
+                        .unwrap()
+                        .to_owned()
+                )
+                .await
+            );
             println!("Getting ownership token");
-            egs.get_ownership_token(ueasset_map.values().last().unwrap().values().last().unwrap().to_owned()).await;
+            egs.get_ownership_token(
+                ueasset_map
+                    .values()
+                    .last()
+                    .unwrap()
+                    .values()
+                    .last()
+                    .unwrap()
+                    .to_owned(),
+            )
+            .await;
             println!("Getting the game token");
             egs.get_game_token().await;
             println!("Getting the entitlements");
             egs.get_user_entitlements().await;
             println!("Getting the library items");
             egs.get_library_items(true).await;
+            println!("Getting Asset manifest");
+            let manifest = egs
+                .get_asset_manifest(
+                    None,
+                    None,
+                    None,
+                    ueasset_map
+                        .values()
+                        .last()
+                        .unwrap()
+                        .values()
+                        .last()
+                        .unwrap()
+                        .clone(),
+                )
+                .await;
+            println!("{:?}", manifest);
+            for elem in manifest.unwrap().elements {
+                for man in elem.manifests {
+                    let download_manifest = egs.get_asset_download_manifest(man).await;
+                    if let Ok(dm) = download_manifest {
+                        // println!("{:#?}", dm.get_files());
+                        break;
+                    }
+                }
+            }
         }
     }
 }
