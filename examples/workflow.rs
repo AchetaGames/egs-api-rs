@@ -58,18 +58,20 @@ async fn main() {
             println!("From that {} non unreal assets", non_ueasset_map.len());
 
             println!("Getting the asset metadata");
+            let test_asset = ueasset_map
+                .values()
+                .last()
+                .unwrap()
+                .values()
+                .last()
+                .unwrap()
+                .to_owned();
             egs.get_asset_manifest(
                 None,
                 None,
-                None,
-                ueasset_map
-                    .values()
-                    .last()
-                    .unwrap()
-                    .values()
-                    .last()
-                    .unwrap()
-                    .to_owned(),
+                Some(test_asset.namespace.clone()),
+                Some(test_asset.catalog_item_id.clone()),
+                Some(test_asset.app_name.clone()),
             )
             .await;
             println!("Getting the asset info");
@@ -129,15 +131,9 @@ async fn main() {
                 .get_asset_manifest(
                     None,
                     None,
-                    None,
-                    ueasset_map
-                        .values()
-                        .last()
-                        .unwrap()
-                        .values()
-                        .last()
-                        .unwrap()
-                        .clone(),
+                    Some(test_asset.namespace.clone()),
+                    Some(test_asset.catalog_item_id.clone()),
+                    Some(test_asset.app_name.clone()),
                 )
                 .await;
             println!("{:?}", manifest);

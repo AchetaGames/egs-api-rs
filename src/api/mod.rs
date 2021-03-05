@@ -117,6 +117,8 @@ pub enum EpicAPIError {
     APIError(String),
     /// Unknown error
     Unknown,
+    /// Invalid parameters
+    InvalidParams,
     /// Server error
     Server,
 }
@@ -136,6 +138,9 @@ impl fmt::Display for EpicAPIError {
             EpicAPIError::APIError(e) => {
                 write!(f, "API Error: {}", e)
             }
+            EpicAPIError::InvalidParams => {
+                write!(f, "Invalid Input Parameters")
+            }
         }
     }
 }
@@ -147,6 +152,7 @@ impl Error for EpicAPIError {
             EpicAPIError::Unknown => "Unknown Error",
             EpicAPIError::Server => "Server Error",
             EpicAPIError::APIError(_) => "API Error",
+            EpicAPIError::InvalidParams => "Invalid Input Parameters"
         }
     }
 }
@@ -340,11 +346,21 @@ impl EpicAPI {
         &self,
         platform: Option<String>,
         label: Option<String>,
+        namespace: Option<String>,
+        item_id: Option<String>,
         app: Option<String>,
-        asset: EpicAsset,
     ) -> Result<AssetManifest, EpicAPIError> {
+        if let None = namespace {
+            return Err(EpicAPIError::InvalidParams);
+        };
+        if let None = item_id {
+            return Err(EpicAPIError::InvalidParams);
+        };
+        if let None = app {
+            return Err(EpicAPIError::InvalidParams);
+        };
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.unwrap_or("Windows".to_string()), asset.namespace, asset.catalog_item_id, app.unwrap_or(asset.app_name), label.unwrap_or("Live".to_string()));
+                          platform.unwrap_or("Windows".to_string()), namespace.unwrap(), item_id.unwrap(), app.unwrap(), label.unwrap_or("Live".to_string()));
         match self
             .get_authorized_get_client(Url::parse(&url).unwrap())
             .send()
@@ -414,8 +430,9 @@ impl EpicAPI {
                                     println!("Error: {:?}", e);
                                     Err(EpicAPIError::Unknown)
                                 }
-                            }}
-                        Err(_) => {Err(EpicAPIError::Unknown)}
+                            }
+                        }
+                        Err(_) => Err(EpicAPIError::Unknown),
                     }
                 } else {
                     println!(
