@@ -53,6 +53,47 @@ impl AssetInfo {
         }
         None
     }
+
+
+    /// Get list of all compatible apps across all releases
+    pub fn get_compatible_apps(&self) -> Option<Vec<String>> {
+        match &self.release_info {
+            None => {}
+            Some(release_infos) => {
+                let mut  res: Vec<String> = Vec::new();
+                for info in release_infos {
+                    match &info.compatible_apps {
+                        None => {}
+                        Some(ca) => res.append(&mut ca.clone()),
+                    };
+                }
+                res.sort();
+                res.dedup();
+                return Some(res);
+            }
+        }
+        None
+    }
+
+    /// Get list of all platforms across all releases
+    pub fn get_platforms(&self) -> Option<Vec<String>> {
+        match &self.release_info {
+            None => {}
+            Some(release_infos) => {
+                let mut  res: Vec<String> = Vec::new();
+                for info in release_infos {
+                    match &info.platform {
+                        None => {}
+                        Some(p) => res.append(&mut p.clone()),
+                    };
+                }
+                res.sort();
+                res.dedup();
+                return Some(res);
+            }
+        }
+        None
+    }
 }
 
 #[allow(missing_docs)]
@@ -92,7 +133,7 @@ pub struct ReleaseInfo {
     pub id: Option<String>,
     pub app_id: Option<String>,
     pub compatible_apps: Option<Vec<String>>,
-    pub platform: Vec<String>,
+    pub platform: Option<Vec<String>>,
     pub date_added: Option<DateTime<Utc>>,
     pub release_note: Option<String>,
     pub version_title: Option<String>,
