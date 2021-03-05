@@ -1,10 +1,9 @@
 use std::io::{self};
 
 use webbrowser;
-
-use egs_api::api::types::EpicAsset;
 use egs_api::EpicGames;
 use std::collections::{HashMap, HashSet};
+use egs_api::api::types::epic_asset::EpicAsset;
 
 #[tokio::main]
 async fn main() {
@@ -99,8 +98,6 @@ async fn main() {
                     test_asset.clone()
                 )
                 .await;
-            println!("{:#?}", asset_info.clone().unwrap().release_info);
-            println!("{:#?}", asset_info.unwrap().get_latest_release());
             println!("Getting ownership token");
             egs.get_ownership_token(
                 test_asset.clone()

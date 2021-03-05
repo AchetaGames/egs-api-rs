@@ -21,11 +21,13 @@
 use chrono;
 use reqwest::header;
 
-use api::types::{
-    AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library,
-    Manifest,
-};
+use api::types::asset_info::{AssetInfo, GameToken};
+use api::types::asset_manifest::{AssetManifest, Manifest};
+use api::types::download_manifest::DownloadManifest;
+use api::types::library::Library;
+use api::types::entitlement::Entitlement;
 
+use crate::api::types::epic_asset::EpicAsset;
 use crate::api::{EpicAPI, EpicAPIError, UserData};
 
 /// Module for authenticated API communication

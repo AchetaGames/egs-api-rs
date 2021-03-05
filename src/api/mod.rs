@@ -4,15 +4,18 @@ use std::error::Error;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
-use reqwest::header::HeaderMap;
 use reqwest::{Client, RequestBuilder, Response};
+use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
-
-use types::{
-    AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library,
-    Manifest, OwnershipToken,
-};
 use url::Url;
+
+use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
+use types::asset_manifest::{AssetManifest, Manifest};
+use types::download_manifest::DownloadManifest;
+use types::entitlement::Entitlement;
+use types::library::Library;
+
+use crate::api::types::epic_asset::EpicAsset;
 
 /// Module holding the API types
 pub mod types;
