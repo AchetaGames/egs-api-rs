@@ -94,30 +94,16 @@ async fn main() {
             for category in cat {
                 println!("{}", category);
             }
-            println!(
-                "{:#?}",
-                egs.get_asset_info(
-                    ueasset_map
-                        .values()
-                        .last()
-                        .unwrap()
-                        .values()
-                        .last()
-                        .unwrap()
-                        .to_owned()
+            let asset_info = egs
+                .get_asset_info(
+                    test_asset.clone()
                 )
-                .await
-            );
+                .await;
+            println!("{:#?}", asset_info.clone().unwrap().release_info);
+            println!("{:#?}", asset_info.unwrap().get_latest_release());
             println!("Getting ownership token");
             egs.get_ownership_token(
-                ueasset_map
-                    .values()
-                    .last()
-                    .unwrap()
-                    .values()
-                    .last()
-                    .unwrap()
-                    .to_owned(),
+                test_asset.clone()
             )
             .await;
             println!("Getting the game token");
