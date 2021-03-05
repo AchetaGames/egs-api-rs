@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,11 +31,11 @@ pub struct DownloadManifest {
 
 impl DownloadManifest {
     /// Convert numbers in the Download Manifest from little indian and %03d concatenated string
-    pub fn blob_to_num(str: String) -> u64 {
-        let mut num: u64 = 0;
-        let mut shift: u64 = 0;
+    pub fn blob_to_num(str: String) -> u128 {
+        let mut num: u128 = 0;
+        let mut shift: u128 = 0;
         for i in (0..str.len()).step_by(3) {
-            if let Ok(n) = str[i..i + 3].parse::<u64>() {
+            if let Ok(n) = str[i..i + 3].parse::<u128>() {
                 num += n << shift;
                 shift += 8;
             }
@@ -44,7 +44,7 @@ impl DownloadManifest {
     }
 
     /// Get chunk dir based on the manifest version
-    fn get_chunk_dir(version: u64) -> &'static str {
+    fn get_chunk_dir(version: u128) -> &'static str {
         if version >= 15 {
             "ChunksV4"
         } else if version >= 6 {
@@ -87,7 +87,7 @@ impl DownloadManifest {
                     DownloadManifest::blob_to_num(hash),
                     guid
                 ))
-                    .unwrap(),
+                .unwrap(),
             );
         }
         result
@@ -129,6 +129,15 @@ impl DownloadManifest {
         }
         return result;
     }
+
+    /// Get total size of files in the manifest
+    pub fn get_total_size(&self) -> u128 {
+        let mut total: u128 = 0;
+        for (_, size) in &self.chunk_filesize_list {
+            total += DownloadManifest::blob_to_num(size.clone());
+        }
+        total
+    }
 }
 
 #[allow(missing_docs)]
@@ -146,8 +155,8 @@ pub struct FileManifest {
 pub struct FileChunk {
     pub guid: String,
     pub link: Url,
-    pub offset: u64,
-    pub size: u64,
+    pub offset: u128,
+    pub size: u128,
 }
 
 #[allow(missing_docs)]
@@ -159,8 +168,7 @@ pub struct FileManifestList {
     pub file_chunk_parts: Vec<FileChunkPart>,
 }
 
-
-// TODO: Write deserialization so offset and size are converted to u64
+// TODO: Write deserialization so offset and size are converted to u128
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
