@@ -1,6 +1,6 @@
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use reqwest::Url;
 
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -24,6 +24,7 @@ pub struct DownloadManifest {
     pub chunk_hash_list: HashMap<String, String>,
     pub chunk_sha_list: Option<HashMap<String, String>>,
     pub data_group_list: HashMap<String, String>,
+    // TODO: Write custom deserialize so this is Hashmap<String, u64>
     pub chunk_filesize_list: HashMap<String, String>,
     pub custom_fields: ::serde_json::Value,
 }
@@ -86,7 +87,7 @@ impl DownloadManifest {
                     DownloadManifest::blob_to_num(hash),
                     guid
                 ))
-                .unwrap(),
+                    .unwrap(),
             );
         }
         result
@@ -158,6 +159,8 @@ pub struct FileManifestList {
     pub file_chunk_parts: Vec<FileChunkPart>,
 }
 
+
+// TODO: Write deserialization so offset and size are converted to u64
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]

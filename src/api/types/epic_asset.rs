@@ -11,3 +11,4 @@ pub struct EpicAsset {
     pub namespace: String,
     pub asset_id: String,
 }
+
