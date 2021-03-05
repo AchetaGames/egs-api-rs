@@ -1,10 +1,9 @@
 use std::io::{self};
 
-use webbrowser;
-
-use egs_api::api::types::EpicAsset;
+use egs_api::api::types::epic_asset::EpicAsset;
 use egs_api::EpicGames;
 use std::collections::{HashMap, HashSet};
+use webbrowser;
 
 #[tokio::main]
 async fn main() {
@@ -74,6 +73,7 @@ async fn main() {
                 Some(test_asset.app_name.clone()),
             )
             .await;
+            println!("{:#?}", test_asset.clone());
             println!("Getting the asset info");
             let mut categories: HashSet<String> = HashSet::new();
             for (_guid, asset) in non_ueasset_map.clone() {
@@ -94,18 +94,9 @@ async fn main() {
             for category in cat {
                 println!("{}", category);
             }
-            let asset_info = egs
-                .get_asset_info(
-                    test_asset.clone()
-                )
-                .await;
-            println!("{:#?}", asset_info.clone().unwrap().release_info);
-            println!("{:#?}", asset_info.unwrap().get_latest_release());
+            let asset_info = egs.get_asset_info(test_asset.clone()).await;
             println!("Getting ownership token");
-            egs.get_ownership_token(
-                test_asset.clone()
-            )
-            .await;
+            egs.get_ownership_token(test_asset.clone()).await;
             println!("Getting the game token");
             egs.get_game_token().await;
             println!("Getting the entitlements");
