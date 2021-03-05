@@ -152,7 +152,7 @@ impl Error for EpicAPIError {
             EpicAPIError::Unknown => "Unknown Error",
             EpicAPIError::Server => "Server Error",
             EpicAPIError::APIError(_) => "API Error",
-            EpicAPIError::InvalidParams => "Invalid Input Parameters"
+            EpicAPIError::InvalidParams => "Invalid Input Parameters",
         }
     }
 }
@@ -407,32 +407,26 @@ impl EpicAPI {
         {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    match response.text().await {
-                        Ok(s) => {
-                            println!("{}", s);
-                            match serde_json::from_str::<DownloadManifest>(&s) {
-                                Ok(mut man) => {
-                                    let mut url = manifest.uri.clone();
-                                    url.set_path(&match url.path_segments() {
-                                        None => "".to_string(),
-                                        Some(segments) => {
-                                            let mut vec: Vec<&str> = segments.collect();
-                                            vec.remove(vec.len() - 1);
-                                            vec.join("/")
-                                        }
-                                    });
-                                    url.set_query(None);
-                                    url.set_fragment(None);
-                                    man.base_url = Some(url);
-                                    Ok(man)
+                    match response.json::<DownloadManifest>().await {
+                        Ok(mut man) => {
+                            let mut url = manifest.uri.clone();
+                            url.set_path(&match url.path_segments() {
+                                None => "".to_string(),
+                                Some(segments) => {
+                                    let mut vec: Vec<&str> = segments.collect();
+                                    vec.remove(vec.len() - 1);
+                                    vec.join("/")
                                 }
-                                Err(e) => {
-                                    println!("Error: {:?}", e);
-                                    Err(EpicAPIError::Unknown)
-                                }
-                            }
+                            });
+                            url.set_query(None);
+                            url.set_fragment(None);
+                            man.base_url = Some(url);
+                            Ok(man)
                         }
-                        Err(_) => Err(EpicAPIError::Unknown),
+                        Err(e) => {
+                            println!("Error: {:?}", e);
+                            Err(EpicAPIError::Unknown)
+                        }
                     }
                 } else {
                     println!(
