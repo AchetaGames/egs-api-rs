@@ -94,6 +94,17 @@ pub struct AssetInfo {
     pub install_modes: Vec<::serde_json::Value>,
 }
 
+impl AssetInfo {
+    /// Get the latest release by release_date
+    pub fn get_latest_release(&self) -> Option<ReleaseInfo> {
+        if let Some(mut release_info) = self.release_info.clone() {
+            release_info.sort_by_key(|ri| ri.date_added);
+            if let Some(rel) = release_info.last() { return Some(rel.clone()) }
+        }
+        None
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -236,7 +247,7 @@ impl DownloadManifest {
                     DownloadManifest::blob_to_num(hash),
                     guid
                 ))
-                .unwrap(),
+                    .unwrap(),
             );
         }
         result

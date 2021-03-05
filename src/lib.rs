@@ -21,7 +21,10 @@
 use chrono;
 use reqwest::header;
 
-use api::types::{AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library, Manifest};
+use api::types::{
+    AssetInfo, AssetManifest, DownloadManifest, Entitlement, EpicAsset, GameToken, Library,
+    Manifest,
+};
 
 use crate::api::{EpicAPI, EpicAPIError, UserData};
 
@@ -31,14 +34,14 @@ pub mod api;
 /// Struct to manage the communication with the Epic Games Store Api
 #[derive(Default, Debug, Clone)]
 pub struct EpicGames {
-    egs: EpicAPI
+    egs: EpicAPI,
 }
 
 impl EpicGames {
     /// Creates new object
     pub fn new() -> Self {
         EpicGames {
-            egs: EpicAPI::new()
+            egs: EpicAPI::new(),
         }
     }
 
@@ -75,9 +78,18 @@ impl EpicGames {
         headers.insert("X-Epic-Event-Category", "login".parse().unwrap());
         headers.insert("X-Epic-Strategy-Flags", "".parse().unwrap());
         headers.insert("X-Requested-With", "XMLHttpRequest".parse().unwrap());
-        headers.insert("User-Agent", "EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live ".parse().unwrap());
+        headers.insert(
+            "User-Agent",
+            "EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live "
+                .parse()
+                .unwrap(),
+        );
         let url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
-        let client = reqwest::Client::builder().cookie_store(true).default_headers(headers).build().unwrap();
+        let client = reqwest::Client::builder()
+            .cookie_store(true)
+            .default_headers(headers)
+            .build()
+            .unwrap();
         match client.get(&url).send().await {
             Ok(_resp) => {}
             _ => {}
@@ -85,7 +97,11 @@ impl EpicGames {
 
         let mut xsrf_token: String = "".to_string();
 
-        match client.get("https://www.epicgames.com/id/api/csrf").send().await {
+        match client
+            .get("https://www.epicgames.com/id/api/csrf")
+            .send()
+            .await
+        {
             Ok(resp) => {
                 for cookie in resp.cookies() {
                     if cookie.name().to_lowercase() == "xsrf-token" {
@@ -96,13 +112,18 @@ impl EpicGames {
             _ => {}
         }
 
-        match client.post("https://www.epicgames.com/id/api/exchange/generate").header("X-XSRF-TOKEN", xsrf_token).send().await {
+        match client
+            .post("https://www.epicgames.com/id/api/exchange/generate")
+            .header("X-XSRF-TOKEN", xsrf_token)
+            .send()
+            .await
+        {
             Ok(resp) => {
                 if resp.status() == reqwest::StatusCode::OK {
                     let echo_json: serde_json::Value = resp.json().await.unwrap();
                     match echo_json["code"].as_str() {
-                        Some(t) => { Some(t.to_string()) }
-                        None => None
+                        Some(t) => Some(t.to_string()),
+                        None => None,
                     }
                 } else {
                     //let echo_json: serde_json::Value = resp.json().await.unwrap();
@@ -110,15 +131,19 @@ impl EpicGames {
                     None
                 }
             }
-            _ => { None }
+            _ => None,
         }
     }
 
     /// Start session with auth code
     pub async fn auth_code(&mut self, code: String) -> bool {
         match self.egs.start_session(Some(code)).await {
-            Ok(b) => { return b; }
-            Err(_) => { return false; }
+            Ok(b) => {
+                return b;
+            }
+            Err(_) => {
+                return false;
+            }
         }
     }
 
@@ -161,7 +186,9 @@ impl EpicGames {
                             }
                             return false;
                         }
-                        Err(e) => { println!("Error: {}", e) }
+                        Err(e) => {
+                            println!("Error: {}", e)
+                        }
                     }
                 }
             }
@@ -172,61 +199,75 @@ impl EpicGames {
     /// Returns all assets
     pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
         match self.egs.get_assets(None, None).await {
-            Ok(b) => { b }
-            Err(_) => { Vec::new() }
+            Ok(b) => b,
+            Err(_) => Vec::new(),
         }
     }
 
     /// Return asset
-    pub async fn get_asset_manifest(&mut self, platform: Option<String>, label: Option<String>, app: Option<String>, asset: EpicAsset) -> Option<AssetManifest> {
-        match self.egs.get_asset_manifest(platform, label, app, asset).await {
-            Ok(a) => { Some(a) }
-            Err(_) => { None }
+    pub async fn get_asset_manifest(
+        &mut self,
+        platform: Option<String>,
+        label: Option<String>,
+        namespace: Option<String>,
+        item_id: Option<String>,
+        app: Option<String>,
+    ) -> Option<AssetManifest> {
+        match self
+            .egs
+            .get_asset_manifest(platform, label, namespace, item_id, app)
+            .await
+        {
+            Ok(a) => Some(a),
+            Err(_) => None,
         }
     }
 
     /// Returns info for an asset
     pub async fn get_asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
         match self.egs.get_asset_info(asset.clone()).await {
-            Ok(mut a) => { a.remove(asset.catalog_item_id.as_str()) }
-            Err(_) => { None }
+            Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
+            Err(_) => None,
         }
     }
 
     /// Returns game token
     pub async fn get_game_token(&mut self) -> Option<GameToken> {
         match self.egs.get_game_token().await {
-            Ok(a) => { Some(a) }
-            Err(_) => { None }
+            Ok(a) => Some(a),
+            Err(_) => None,
         }
     }
 
     /// Returns ownership token for an Asset
     pub async fn get_ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
         match self.egs.get_ownership_token(asset).await {
-            Ok(a) => { Some(a.token) }
-            Err(_) => { None }
+            Ok(a) => Some(a.token),
+            Err(_) => None,
         }
     }
 
     ///Returns user entitlements
     pub async fn get_user_entitlements(&mut self) -> Vec<Entitlement> {
         match self.egs.get_user_entitlements().await {
-            Ok(a) => { a }
-            Err(_) => { Vec::new() }
+            Ok(a) => a,
+            Err(_) => Vec::new(),
         }
     }
 
     /// Returns the user library
     pub async fn get_library_items(&mut self, include_metadata: bool) -> Option<Library> {
         match self.egs.get_library_items(include_metadata).await {
-            Ok(a) => { Some(a) }
-            Err(_) => { None }
+            Ok(a) => Some(a),
+            Err(_) => None,
         }
     }
 
     /// Returns a DownloadManifest for a specified file manifest
-    pub async fn get_asset_download_manifest(&self, manifest: Manifest) -> Result<DownloadManifest, EpicAPIError> {
+    pub async fn get_asset_download_manifest(
+        &self,
+        manifest: Manifest,
+    ) -> Result<DownloadManifest, EpicAPIError> {
         match self.egs.get_asset_download_manifest(manifest).await {
             Ok(manifest) => Ok(manifest),
             Err(e) => Err(e),
