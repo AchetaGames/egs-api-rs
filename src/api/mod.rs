@@ -8,6 +8,7 @@ use reqwest::{Client, RequestBuilder, Response};
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use url::Url;
+use log::{error,warn};
 
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use types::asset_manifest::{AssetManifest, Manifest};
@@ -215,7 +216,7 @@ impl EpicAPI {
                 return self.handle_login_response(response).await;
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -223,13 +224,13 @@ impl EpicAPI {
 
     async fn handle_login_response(&mut self, response: Response) -> Result<bool, EpicAPIError> {
         if response.status() == reqwest::StatusCode::INTERNAL_SERVER_ERROR {
-            println!("Server Error");
+            error!("Server Error");
             return Err(EpicAPIError::Server);
         }
         let new: UserData = match response.json().await {
             Ok(data) => data,
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 return Err(EpicAPIError::Unknown);
             }
         };
@@ -239,7 +240,7 @@ impl EpicAPI {
         match &self.user_data.error_message {
             None => {}
             Some(m) => {
-                println!("Error: {}", m);
+                error!("{}", m);
                 return Err(EpicAPIError::APIError(m.to_string()));
             }
         }
@@ -301,7 +302,7 @@ impl EpicAPI {
                 return self.handle_login_response(response).await;
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -325,12 +326,12 @@ impl EpicAPI {
                     match response.json().await {
                         Ok(assets) => Ok(assets),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -339,7 +340,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -374,12 +375,12 @@ impl EpicAPI {
                     match response.json().await {
                         Ok(manifest) => Ok(manifest),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -388,7 +389,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -427,12 +428,12 @@ impl EpicAPI {
                             Ok(man)
                         }
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -441,7 +442,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -460,20 +461,15 @@ impl EpicAPI {
         {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    // match response.text().await {
-                    //     Ok(t) => { println!("4321574 {},", t); }
-                    //     Err(_) => {}
-                    // }
-
                     match response.json().await {
                         Ok(info) => Ok(info),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -482,7 +478,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -502,12 +498,12 @@ impl EpicAPI {
                     match response.json().await {
                         Ok(token) => Ok(token),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -516,7 +512,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -549,12 +545,12 @@ impl EpicAPI {
                     match response.json().await {
                         Ok(token) => Ok(token),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -563,7 +559,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -589,12 +585,12 @@ impl EpicAPI {
                     match response.json().await {
                         Ok(ent) => Ok(ent),
                         Err(e) => {
-                            println!("Error: {:?}", e);
+                            error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
                         }
                     }
                 } else {
-                    println!(
+                    warn!(
                         "{} result: {}",
                         response.status(),
                         response.text().await.unwrap()
@@ -603,7 +599,7 @@ impl EpicAPI {
                 }
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                error!("{:?}", e);
                 Err(EpicAPIError::Unknown)
             }
         }
@@ -653,11 +649,11 @@ impl EpicAPI {
                                 }
                             }
                             Err(e) => {
-                                println!("Error: {:?}", e);
+                                error!("{:?}", e);
                             }
                         }
                     } else {
-                        println!(
+                        warn!(
                             "{} result: {}",
                             response.status(),
                             response.text().await.unwrap()
@@ -665,7 +661,7 @@ impl EpicAPI {
                     }
                 }
                 Err(e) => {
-                    println!("Error: {:?}", e);
+                    error!("{:?}", e);
                 }
             };
             if cursor.is_none() {

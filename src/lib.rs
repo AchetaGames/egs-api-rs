@@ -20,6 +20,7 @@
 
 use chrono;
 use reqwest::header;
+use log::{error,info,warn};
 
 use api::types::asset_info::{AssetInfo, GameToken};
 use api::types::asset_manifest::{AssetManifest, Manifest};
@@ -157,23 +158,23 @@ impl EpicGames {
                 let now = chrono::offset::Utc::now();
                 let td = exp - now;
                 if td.num_seconds() > 600 {
-                    println!("Trying to re-use existing login session... ");
+                    info!("Trying to re-use existing login session... ");
                     match self.egs.resume_session().await {
                         Ok(b) => {
                             if b {
-                                println!("Logged in");
+                                info!("Logged in");
                                 return true;
                             }
                             return false;
                         }
                         Err(e) => {
-                            println!("Error: {}", e)
+                            warn!("{}", e)
                         }
                     };
                 }
             }
         }
-        println!("Logging in...");
+        info!("Logging in...");
         match self.egs.user_data.refresh_expires_at {
             None => {}
             Some(exp) => {
@@ -183,13 +184,13 @@ impl EpicGames {
                     match self.egs.start_session(None).await {
                         Ok(b) => {
                             if b {
-                                println!("Logged in");
+                                info!("Logged in");
                                 return true;
                             }
                             return false;
                         }
                         Err(e) => {
-                            println!("Error: {}", e)
+                            error!("{}", e)
                         }
                     }
                 }
