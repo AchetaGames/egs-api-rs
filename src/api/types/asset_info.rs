@@ -54,6 +54,16 @@ impl AssetInfo {
         None
     }
 
+    /// Get list of sorted releases newest to oldest
+    pub fn get_sorted_releases(&self) -> Option<Vec<ReleaseInfo>> {
+        if let Some(mut release_info) = self.release_info.clone() {
+            release_info.sort_by_key(|ri| ri.date_added);
+            release_info.reverse();
+            Some(release_info)
+        } else {
+            None
+        }
+    }
 
     /// Get list of all compatible apps across all releases
     pub fn get_compatible_apps(&self) -> Option<Vec<String>> {
