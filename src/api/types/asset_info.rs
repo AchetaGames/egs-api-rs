@@ -64,6 +64,18 @@ impl AssetInfo {
         }
     }
 
+    /// Get release info based on the release id
+    pub fn get_release_id(&self, id: String) -> Option<ReleaseInfo> {
+        if let Some(releases) = self.release_info.clone() {
+            for release in releases {
+                if release.id.clone().unwrap_or_default() == id {
+                    return Some(release);
+                }
+            }
+        };
+        None
+    }
+
     /// Get list of all compatible apps across all releases
     pub fn get_compatible_apps(&self) -> Option<Vec<String>> {
         match &self.release_info {
