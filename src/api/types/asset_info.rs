@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::alloc::Global;
 use std::collections::HashMap;
 
 #[allow(missing_docs)]
@@ -45,9 +46,8 @@ pub struct AssetInfo {
 impl AssetInfo {
     /// Get the latest release by release_date
     pub fn get_latest_release(&self) -> Option<ReleaseInfo> {
-        if let Some(mut release_info) = self.release_info.clone() {
-            release_info.sort_by_key(|ri| ri.date_added);
-            if let Some(rel) = release_info.last() {
+        if let Some(releases) = self.get_sorted_releases() {
+            if let Some(rel) = releases.first() {
                 return Some(rel.clone());
             }
         }
@@ -70,7 +70,7 @@ impl AssetInfo {
         match &self.release_info {
             None => {}
             Some(release_infos) => {
-                let mut  res: Vec<String> = Vec::new();
+                let mut res: Vec<String> = Vec::new();
                 for info in release_infos {
                     match &info.compatible_apps {
                         None => {}
@@ -90,7 +90,7 @@ impl AssetInfo {
         match &self.release_info {
             None => {}
             Some(release_infos) => {
-                let mut  res: Vec<String> = Vec::new();
+                let mut res: Vec<String> = Vec::new();
                 for info in release_infos {
                     match &info.platform {
                         None => {}
