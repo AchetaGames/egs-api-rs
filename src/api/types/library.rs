@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::rust::string_empty_as_none;
 
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -23,5 +24,6 @@ pub struct Record {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseMetadata {
+    #[serde(with = "string_empty_as_none")]
     pub next_cursor: Option<String>,
 }

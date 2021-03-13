@@ -9,6 +9,7 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use log::{error,warn};
+use serde_with::rust::string_empty_as_none;
 
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use types::asset_manifest::{AssetManifest, Manifest};
@@ -30,22 +31,30 @@ pub struct UserData {
     access_token: Option<String>,
     pub expires_in: Option<i64>,
     pub expires_at: Option<DateTime<Utc>>,
+    #[serde(with = "string_empty_as_none")]
     pub token_type: Option<String>,
+    #[serde(with = "string_empty_as_none")]
     refresh_token: Option<String>,
     pub refresh_expires: Option<i64>,
     pub refresh_expires_at: Option<DateTime<Utc>>,
+    #[serde(with = "string_empty_as_none")]
     pub account_id: Option<String>,
+    #[serde(with = "string_empty_as_none")]
     pub client_id: Option<String>,
     pub internal_client: Option<bool>,
+    #[serde(with = "string_empty_as_none")]
     pub client_service: Option<String>,
-    #[serde(rename = "displayName")]
+    #[serde(rename = "displayName", with = "string_empty_as_none")]
     pub display_name: Option<String>,
+    #[serde(with = "string_empty_as_none")]
     pub app: Option<String>,
+    #[serde(with = "string_empty_as_none")]
     pub in_app_id: Option<String>,
+    #[serde(with = "string_empty_as_none")]
     pub device_id: Option<String>,
-    #[serde(rename = "errorMessage")]
+    #[serde(rename = "errorMessage", with = "string_empty_as_none")]
     pub error_message: Option<String>,
-    #[serde(rename = "errorCode")]
+    #[serde(rename = "errorCode", with = "string_empty_as_none")]
     pub error_code: Option<String>,
 }
 
