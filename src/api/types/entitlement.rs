@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_with::rust::string_empty_as_none;
 
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -21,8 +20,6 @@ pub struct Entitlement {
     pub updated: String,
     pub group_entitlement: bool,
     pub original_use_count: Option<i64>,
-    #[serde(with = "string_empty_as_none")]
     pub platform_type: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub country: Option<String>,
 }

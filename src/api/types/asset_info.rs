@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_with::rust::string_empty_as_none;
 use std::collections::HashMap;
 
 #[allow(missing_docs)]
@@ -9,28 +8,20 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
     pub id: String,
-    #[serde(with = "string_empty_as_none")]
     pub title: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub description: Option<String>,
     pub key_images: Option<Vec<KeyImage>>,
     pub categories: Option<Vec<Category>>,
     pub namespace: String,
-    #[serde(with = "string_empty_as_none")]
     pub status: Option<String>,
     pub creation_date: Option<DateTime<Utc>>,
     pub last_modified_date: Option<DateTime<Utc>>,
     pub custom_attributes: Option<HashMap<String, CustomAttribute>>,
-    #[serde(with = "string_empty_as_none")]
     pub entitlement_name: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub entitlement_type: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub item_type: Option<String>,
     pub release_info: Option<Vec<ReleaseInfo>>,
-    #[serde(with = "string_empty_as_none")]
     pub developer: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub developer_id: Option<String>,
     #[serde(default)]
     pub eula_ids: Vec<String>,
@@ -38,18 +29,14 @@ pub struct AssetInfo {
     #[serde(default)]
     pub dlc_item_list: Vec<AssetInfo>,
     pub age_gatings: Option<::serde_json::Value>,
-    #[serde(with = "string_empty_as_none")]
     pub application_id: Option<String>,
     pub unsearchable: bool,
     pub self_refundable: Option<bool>,
     pub requires_secure_account: Option<bool>,
-    #[serde(with = "string_empty_as_none")]
     pub long_description: Option<String>,
     pub main_game_item: Box<Option<AssetInfo>>,
-    #[serde(with = "string_empty_as_none")]
     pub esrb_game_rating_value: Option<String>,
     pub use_count: Option<i64>,
-    #[serde(with = "string_empty_as_none")]
     pub technical_details: Option<String>,
     #[serde(default)]
     pub install_modes: Vec<::serde_json::Value>,
@@ -58,8 +45,9 @@ pub struct AssetInfo {
 impl AssetInfo {
     /// Get the latest release by release_date
     pub fn get_latest_release(&self) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.get_sorted_releases() {
-            if let Some(rel) = releases.first() {
+        if let Some(mut release_info) = self.release_info.clone() {
+            release_info.sort_by_key(|ri| ri.date_added);
+            if let Some(rel) = release_info.last() {
                 return Some(rel.clone());
             }
         }
@@ -82,7 +70,7 @@ impl AssetInfo {
         match &self.release_info {
             None => {}
             Some(release_infos) => {
-                let mut res: Vec<String> = Vec::new();
+                let mut  res: Vec<String> = Vec::new();
                 for info in release_infos {
                     match &info.compatible_apps {
                         None => {}
@@ -102,7 +90,7 @@ impl AssetInfo {
         match &self.release_info {
             None => {}
             Some(release_infos) => {
-                let mut res: Vec<String> = Vec::new();
+                let mut  res: Vec<String> = Vec::new();
                 for info in release_infos {
                     match &info.platform {
                         None => {}
@@ -152,16 +140,12 @@ pub struct CustomAttribute {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseInfo {
-    #[serde(with = "string_empty_as_none")]
     pub id: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub app_id: Option<String>,
     pub compatible_apps: Option<Vec<String>>,
     pub platform: Option<Vec<String>>,
     pub date_added: Option<DateTime<Utc>>,
-    #[serde(with = "string_empty_as_none")]
     pub release_note: Option<String>,
-    #[serde(with = "string_empty_as_none")]
     pub version_title: Option<String>,
 }
 
