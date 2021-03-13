@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::alloc::Global;
 use std::collections::HashMap;
 
 #[allow(missing_docs)]
