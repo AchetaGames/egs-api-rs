@@ -4,11 +4,11 @@ use std::error::Error;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
-use reqwest::{Client, RequestBuilder, Response};
+use log::{debug, error, warn};
 use reqwest::header::HeaderMap;
+use reqwest::{Client, ClientBuilder, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use url::Url;
-use log::{error,warn};
 
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use types::asset_manifest::{AssetManifest, Manifest};
@@ -17,6 +17,7 @@ use types::entitlement::Entitlement;
 use types::library::Library;
 
 use crate::api::types::epic_asset::EpicAsset;
+use std::str::FromStr;
 
 /// Module holding the API types
 pub mod types;
@@ -163,6 +164,14 @@ impl Error for EpicAPIError {
 
 impl EpicAPI {
     pub fn new() -> Self {
+        let client = EpicAPI::build_client().build().unwrap();
+        EpicAPI {
+            client,
+            user_data: Default::default(),
+        }
+    }
+
+    fn build_client() -> ClientBuilder {
         let mut headers = HeaderMap::new();
         headers.insert(
             "User-Agent",
@@ -172,13 +181,8 @@ impl EpicAPI {
         );
         let client = reqwest::Client::builder()
             .default_headers(headers)
-            .cookie_store(true)
-            .build()
-            .unwrap();
-        EpicAPI {
-            client,
-            user_data: Default::default(),
-        }
+            .cookie_store(true);
+        client
     }
 
     pub async fn start_session(
@@ -248,34 +252,12 @@ impl EpicAPI {
     }
 
     fn get_authorized_get_client(&self, url: Url) -> RequestBuilder {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "User-Agent",
-            "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit"
-                .parse()
-                .unwrap(),
-        );
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .cookie_store(true)
-            .build()
-            .unwrap();
+        let client = EpicAPI::build_client().build().unwrap();
         self.set_authorization_header(client.clone().get(url))
     }
 
     fn get_authorized_post_client(&self, url: Url) -> RequestBuilder {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "User-Agent",
-            "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit"
-                .parse()
-                .unwrap(),
-        );
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .cookie_store(true)
-            .build()
-            .unwrap();
+        let client = EpicAPI::build_client().build().unwrap();
         self.set_authorization_header(client.clone().post(url))
     }
 
@@ -399,34 +381,38 @@ impl EpicAPI {
         &self,
         manifest: Manifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
-        let mut queries: Vec<(String, String)> = Vec::new();
+        let mut queries: Vec<String> = Vec::new();
+        debug!("{:?}", manifest);
         for query in manifest.query_params {
-            queries.push((query.name, query.value));
+            queries.push(format!("{}={}", query.name, query.value));
         }
-        match self
-            .get_authorized_get_client(manifest.uri.clone())
-            .query(&queries)
-            .send()
-            .await
-        {
+        let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
+        let client = EpicAPI::build_client().build().unwrap();
+        match client.get(Url::from_str(&url).unwrap()).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    match response.json::<DownloadManifest>().await {
-                        Ok(mut man) => {
-                            let mut url = manifest.uri.clone();
-                            url.set_path(&match url.path_segments() {
-                                None => "".to_string(),
-                                Some(segments) => {
-                                    let mut vec: Vec<&str> = segments.collect();
-                                    vec.remove(vec.len() - 1);
-                                    vec.join("/")
-                                }
-                            });
-                            url.set_query(None);
-                            url.set_fragment(None);
-                            man.base_url = Some(url);
-                            Ok(man)
-                        }
+                    match response.bytes().await {
+                        Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                            None => {
+                                error!("Unable to parse the Download Manifest");
+                                Err(EpicAPIError::Unknown)
+                            }
+                            Some(mut man) => {
+                                let mut url = manifest.uri.clone();
+                                url.set_path(&match url.path_segments() {
+                                    None => "".to_string(),
+                                    Some(segments) => {
+                                        let mut vec: Vec<&str> = segments.collect();
+                                        vec.remove(vec.len() - 1);
+                                        vec.join("/")
+                                    }
+                                });
+                                url.set_query(None);
+                                url.set_fragment(None);
+                                man.base_url = Some(url);
+                                Ok(man)
+                            }
+                        },
                         Err(e) => {
                             error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
