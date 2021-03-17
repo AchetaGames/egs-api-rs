@@ -256,31 +256,33 @@ impl DownloadManifest {
         matching == a.len() && matching == b.len()
     }
 
-    fn split(buffer: &mut Vec<u8>, size: usize) -> Vec<u8> {
-        buffer.drain(0..size).collect()
-    }
-    fn read_le(buffer: Vec<u8>) -> u32 {
-        u32::from_le_bytes(buffer.try_into().unwrap())
+    fn read_le(buffer: &Vec<u8>, position: &mut usize) -> u32 {
+        *position += 4;
+        u32::from_le_bytes(buffer[*position - 4..*position].try_into().unwrap())
     }
 
-    fn read_le_64(buffer: Vec<u8>) -> u64 {
-        u64::from_le_bytes(buffer.try_into().unwrap())
+    fn read_le_signed(buffer: &Vec<u8>, position: &mut usize) -> i32 {
+        *position += 4;
+        i32::from_le_bytes(buffer[*position - 4..*position].try_into().unwrap())
     }
 
-    fn read_le_64_signed(buffer: Vec<u8>) -> i64 {
-        i64::from_le_bytes(buffer.try_into().unwrap())
+    fn read_le_64(buffer: &Vec<u8>, position: &mut usize) -> u64 {
+        *position += 8;
+        u64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
     }
 
-    fn read_le_signed(buffer: Vec<u8>) -> i32 {
-        i32::from_le_bytes(buffer.try_into().unwrap())
+    fn read_le_64_signed(buffer: &Vec<u8>, position: &mut usize) -> i64 {
+        *position += 8;
+        i64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
     }
 
-    fn read_fstring(buffer: &mut Vec<u8>) -> Option<String> {
-        let mut length = DownloadManifest::read_le_signed(DownloadManifest::split(buffer, 4));
+    fn read_fstring(buffer: &Vec<u8>, position: &mut usize) -> Option<String> {
+        let mut length = DownloadManifest::read_le_signed(buffer, position);
         if length < 0 {
             length *= -2;
+            *position += length as usize;
             Some(String::from_utf16_lossy(
-                DownloadManifest::split(buffer, (length) as usize)
+                buffer[*position - length as usize..*position]
                     .chunks_exact(2)
                     .into_iter()
                     .map(|a| u16::from_ne_bytes([a[0], a[1]]))
@@ -288,7 +290,8 @@ impl DownloadManifest {
                     .as_slice(),
             ))
         } else if length > 0 {
-            match std::str::from_utf8(&DownloadManifest::split(buffer, (length) as usize)) {
+            *position += length as usize;
+            match std::str::from_utf8(&buffer[*position - length as usize..*position]) {
                 Ok(s) => Some(s.to_string()),
                 Err(_) => None,
             }
@@ -309,7 +312,7 @@ impl DownloadManifest {
                 }
             }
             Some(dm) => {
-                debug!("Binary arsing successful");
+                debug!("Binary parsing successful");
                 Some(dm)
             }
         }
@@ -338,68 +341,74 @@ impl DownloadManifest {
             custom_fields: Default::default(),
         };
 
-        let total_size = buffer.len();
+        let mut position: usize = 0;
 
         // Reading Header
-        let magic = DownloadManifest::read_le(DownloadManifest::split(&mut buffer, 4));
+        let magic = DownloadManifest::read_le(&buffer, &mut position);
         if magic != 1153351692 {
             error!("No header magic");
             return None;
         }
-        let header_size = DownloadManifest::read_le(DownloadManifest::split(&mut buffer, 4));
-        let _size_uncompressed = DownloadManifest::read_le(DownloadManifest::split(&mut buffer, 4));
-        let _size_compressed = DownloadManifest::read_le(DownloadManifest::split(&mut buffer, 4));
-        let sha_hash = DownloadManifest::split(&mut buffer, 20);
-        let compressed = match DownloadManifest::split(&mut buffer, 1)[0] {
+        let mut header_size = DownloadManifest::read_le(&buffer, &mut position);
+        let _size_uncompressed = DownloadManifest::read_le(&buffer, &mut position);
+        let _size_compressed = DownloadManifest::read_le(&buffer, &mut position);
+        position += 20;
+        let sha_hash: [u8; 20] = buffer[position - 20..position].try_into().unwrap();
+        let compressed = match buffer[position] {
             0 => false,
             _ => true,
         };
-        let _version = DownloadManifest::read_le(DownloadManifest::split(&mut buffer, 4));
+        position += 1;
+        let _version = DownloadManifest::read_le(&buffer, &mut position);
 
-        let mut data = if compressed {
-            let mut z = ZlibDecoder::new(&*buffer);
+        buffer = if compressed {
+            let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
             z.read_to_end(&mut data).unwrap();
-            if !DownloadManifest::do_vecs_match(&sha_hash, &Sha1::digest(&data).to_vec()) {
+            if !DownloadManifest::do_vecs_match(&sha_hash.to_vec(), &Sha1::digest(&data).to_vec()) {
                 error!("The extracted hash does not match");
                 return None;
             }
-
+            position = 0;
+            header_size = 0;
             data
         } else {
-            buffer.clone()
+            buffer
         };
 
         debug!(
             "Download manifest header read length(needs to match {}): {}",
-            header_size,
-            total_size - buffer.len()
+            header_size, position
         );
 
         // Manifest Meta
 
-        let total_size = data.len();
-        let meta_size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let meta_size = DownloadManifest::read_le(&buffer, &mut position);
 
-        let data_version = DownloadManifest::split(&mut data, 1)[0];
+        let data_version = buffer[position];
+        position += 1;
 
-        res.manifest_file_version =
-            DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)).into();
+        res.manifest_file_version = DownloadManifest::read_le(&buffer, &mut position).into();
 
-        res.b_is_file_data = match DownloadManifest::split(&mut data, 1)[0] {
+        res.b_is_file_data = match buffer[position] {
             0 => false,
             _ => true,
         };
-        res.app_id = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)).to_string();
-        res.app_name_string = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
-        res.build_version_string = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
-        res.launch_exe_string = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
-        res.launch_command = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
+        position += 1;
+        res.app_id = DownloadManifest::read_le(&buffer, &mut position).to_string();
+        res.app_name_string =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
+        res.build_version_string =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
+        res.launch_exe_string =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
+        res.launch_command =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
 
-        let entries = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let entries = DownloadManifest::read_le(&buffer, &mut position);
         let mut prereq_ids: Vec<::serde_json::Value> = Vec::new();
         for _ in 0..entries {
-            if let Some(s) = DownloadManifest::read_fstring(&mut data) {
+            if let Some(s) = DownloadManifest::read_fstring(&buffer, &mut position) {
                 prereq_ids.push(json!(s))
             }
         }
@@ -409,12 +418,15 @@ impl DownloadManifest {
             res.prereq_ids = Some(prereq_ids);
         }
 
-        res.prereq_name = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
-        res.prereq_path = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
-        res.prereq_args = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
+        res.prereq_name =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
+        res.prereq_path =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
+        res.prereq_args =
+            DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
 
         res.build_version_string = if data_version > 0 {
-            DownloadManifest::read_fstring(&mut data)
+            DownloadManifest::read_fstring(&buffer, &mut position)
         } else {
             None
         }
@@ -423,29 +435,29 @@ impl DownloadManifest {
         debug!(
             "Manifest metadata read length(needs to match {}): {}",
             meta_size,
-            total_size - data.len()
+            position - header_size as usize
         );
 
         // Chunks
 
-        let total_size = data.len();
-        let size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let chunk_size = DownloadManifest::read_le(&buffer, &mut position);
 
-        let _version = DownloadManifest::split(&mut data, 1)[0];
+        let _version = buffer[position];
+        position += 1;
 
-        let count = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let count = DownloadManifest::read_le(&buffer, &mut position);
         debug!("Reading {} chunks", count);
 
         let mut chunks: Vec<BinaryChunkInfo> = Vec::new();
-        for i in 0..count {
+        for _i in 0..count {
             chunks.push(BinaryChunkInfo {
                 manifest_version: res.manifest_file_version,
                 guid: format!(
                     "{:08x}{:08x}{:08x}{:08x}",
-                    DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                    DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                    DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                    DownloadManifest::read_le(DownloadManifest::split(&mut data, 4))
+                    DownloadManifest::read_le(&buffer, &mut position),
+                    DownloadManifest::read_le(&buffer, &mut position),
+                    DownloadManifest::read_le(&buffer, &mut position),
+                    DownloadManifest::read_le(&buffer, &mut position)
                 ),
                 hash: 0,
                 sha_hash: Vec::new(),
@@ -457,24 +469,24 @@ impl DownloadManifest {
 
         debug!("Reading Chunk Hashes");
         for chunk in chunks.iter_mut() {
-            chunk.hash =
-                DownloadManifest::read_le_64(DownloadManifest::split(&mut data, 8)) as u128;
+            chunk.hash = DownloadManifest::read_le_64(&buffer, &mut position) as u128;
         }
         debug!("Reading Chunk Sha Hashes");
         for chunk in chunks.iter_mut() {
-            chunk.sha_hash = DownloadManifest::split(&mut data, 20);
+            position += 20;
+            chunk.sha_hash = buffer[position - 20..position].try_into().unwrap();
         }
 
         debug!("Reading Chunk group nums");
         for chunk in chunks.iter_mut() {
-            chunk.group_num = DownloadManifest::split(&mut data, 1)[0];
+            chunk.group_num = buffer[position];
+            position += 1;
         }
         for chunk in chunks.iter_mut() {
-            chunk.window_size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+            chunk.window_size = DownloadManifest::read_le(&buffer, &mut position);
         }
         for chunk in chunks.iter_mut() {
-            chunk.file_size =
-                DownloadManifest::read_le_64_signed(DownloadManifest::split(&mut data, 8));
+            chunk.file_size = DownloadManifest::read_le_64_signed(&buffer, &mut position);
         }
 
         let mut chunk_sha_list: HashMap<String, String> = HashMap::new();
@@ -501,23 +513,23 @@ impl DownloadManifest {
 
         debug!(
             "Chunks read length(needs to match {}): {}",
-            size,
-            total_size - data.len()
+            chunk_size,
+            position - meta_size as usize - header_size as usize
         );
 
         // File Manifest
-        let total_size = data.len();
 
-        let size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let filemanifest_size = DownloadManifest::read_le(&buffer, &mut position);
 
-        let _version = DownloadManifest::split(&mut data, 1)[0];
-
-        let count = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let _version = buffer[position];
+        position += 1;
+        let count = DownloadManifest::read_le(&buffer, &mut position);
 
         let mut files: Vec<BinaryFileManifest> = Vec::new();
         for _ in 0..count {
             files.push(BinaryFileManifest {
-                filename: DownloadManifest::read_fstring(&mut data).unwrap_or_default(),
+                filename: DownloadManifest::read_fstring(&buffer, &mut position)
+                    .unwrap_or_default(),
                 symlink_target: "".to_string(),
                 hash: vec![],
                 flags: 0,
@@ -528,51 +540,56 @@ impl DownloadManifest {
         }
 
         for file in files.iter_mut() {
-            file.symlink_target = DownloadManifest::read_fstring(&mut data).unwrap_or_default();
+            file.symlink_target =
+                DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default();
         }
 
         for file in files.iter_mut() {
-            file.hash = DownloadManifest::split(&mut data, 20);
+            position += 20;
+            file.hash = buffer[position - 20..position].try_into().unwrap();
         }
 
         for file in files.iter_mut() {
-            file.flags = DownloadManifest::split(&mut data, 1)[0];
+            file.flags = buffer[position];
+            position += 1;
         }
 
         for file in files.iter_mut() {
-            let elem_count = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+            let elem_count = DownloadManifest::read_le(&buffer, &mut position);
             for _ in 0..elem_count {
-                file.install_tags
-                    .push(DownloadManifest::read_fstring(&mut data).unwrap_or_default())
+                file.install_tags.push(
+                    DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default(),
+                )
             }
         }
 
-        for file in files.iter_mut() {
-            let elem_count = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
-            let mut offset: u128 = 0;
-            for _ in 0..elem_count {
-                let total = data.len();
-                let chunk_size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
-                let chunk = BinaryChunkPart {
-                    guid: format!(
-                        "{:08x}{:08x}{:08x}{:08x}",
-                        DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                        DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                        DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)),
-                        DownloadManifest::read_le(DownloadManifest::split(&mut data, 4))
-                    ),
-                    offset: DownloadManifest::read_le(DownloadManifest::split(&mut data, 4))
-                        as u128,
-                    size: DownloadManifest::read_le(DownloadManifest::split(&mut data, 4)) as u128,
-                    file_offset: offset,
-                };
-                offset += chunk.size as u128;
-                let diff = total - data.len() - chunk_size as usize;
-                if diff > 0 {
-                    warn!("Did not read the entire chunk part!");
-                    DownloadManifest::split(&mut data, diff);
+        for i in 0..count {
+            if let Some(file) = files.get_mut(i as usize) {
+                let elem_count = DownloadManifest::read_le(&buffer, &mut position);
+                let mut offset: u128 = 0;
+                for _i in 0..elem_count {
+                    let total = position;
+                    let chunk_size = DownloadManifest::read_le(&buffer, &mut position);
+                    let chunk = BinaryChunkPart {
+                        guid: format!(
+                            "{:08x}{:08x}{:08x}{:08x}",
+                            DownloadManifest::read_le(&buffer, &mut position),
+                            DownloadManifest::read_le(&buffer, &mut position),
+                            DownloadManifest::read_le(&buffer, &mut position),
+                            DownloadManifest::read_le(&buffer, &mut position)
+                        ),
+                        offset: DownloadManifest::read_le(&buffer, &mut position) as u128,
+                        size: DownloadManifest::read_le(&buffer, &mut position) as u128,
+                        file_offset: offset,
+                    };
+                    offset += chunk.size;
+                    let diff = position - total - chunk_size as usize;
+                    if diff > 0 {
+                        warn!("Did not read the entire chunk part!");
+                        position += diff
+                    }
+                    file.chunk_parts.push(chunk);
                 }
-                file.chunk_parts.push(chunk);
             }
         }
 
@@ -603,28 +620,27 @@ impl DownloadManifest {
 
         debug!(
             "File Manifests read length(needs to match {}): {}",
-            size,
-            total_size - data.len()
+            filemanifest_size,
+            position - meta_size as usize - header_size as usize - chunk_size as usize
         );
 
         // Custom Fields
-        let total_size = data.len();
 
-        let size = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let size = DownloadManifest::read_le(&buffer, &mut position);
 
-        let _version = DownloadManifest::split(&mut data, 1)[0];
-
-        let count = DownloadManifest::read_le(DownloadManifest::split(&mut data, 4));
+        let _version = buffer[position];
+        position += 1;
+        let count = DownloadManifest::read_le(&buffer, &mut position);
 
         let mut keys: Vec<String> = Vec::new();
         let mut values: Vec<String> = Vec::new();
 
         for _ in 0..count {
-            keys.push(DownloadManifest::read_fstring(&mut data).unwrap_or_default());
+            keys.push(DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default());
         }
 
         for _ in 0..count {
-            values.push(DownloadManifest::read_fstring(&mut data).unwrap_or_default());
+            values.push(DownloadManifest::read_fstring(&buffer, &mut position).unwrap_or_default());
         }
 
         let mut custom_fields: HashMap<String, String> = HashMap::new();
@@ -637,11 +653,22 @@ impl DownloadManifest {
         debug!(
             "Custom fields read length(needs to match {}): {}",
             size,
-            total_size - data.len()
+            position
+                - meta_size as usize
+                - header_size as usize
+                - chunk_size as usize
+                - filemanifest_size as usize
         );
 
-        if data.len() > 0 {
-            warn!("We have not read some data {}", data.len());
+        if position
+            - meta_size as usize
+            - header_size as usize
+            - chunk_size as usize
+            - filemanifest_size as usize
+            - size as usize
+            != 0
+        {
+            warn!("We have not read some data ");
         }
 
         Some(res)
