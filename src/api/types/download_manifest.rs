@@ -282,7 +282,7 @@ impl DownloadManifest {
             length *= -2;
             *position += length as usize;
             Some(String::from_utf16_lossy(
-                buffer[*position - length as usize..*position]
+                buffer[*position - length as usize..*position - 2]
                     .chunks_exact(2)
                     .into_iter()
                     .map(|a| u16::from_ne_bytes([a[0], a[1]]))
@@ -291,7 +291,7 @@ impl DownloadManifest {
             ))
         } else if length > 0 {
             *position += length as usize;
-            match std::str::from_utf8(&buffer[*position - length as usize..*position]) {
+            match std::str::from_utf8(&buffer[*position - length as usize..*position - 1]) {
                 Ok(s) => Some(s.to_string()),
                 Err(_) => None,
             }
