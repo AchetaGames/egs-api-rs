@@ -94,7 +94,7 @@ async fn main() {
             for category in cat {
                 println!("{}", category);
             }
-            let asset_info = egs.get_asset_info(test_asset.clone()).await;
+            let _asset_info = egs.get_asset_info(test_asset.clone()).await;
             println!("Getting ownership token");
             egs.get_ownership_token(test_asset.clone()).await;
             println!("Getting the game token");
@@ -117,7 +117,7 @@ async fn main() {
             for elem in manifest.unwrap().elements {
                 for man in elem.manifests {
                     let download_manifest = egs.get_asset_download_manifest(man).await;
-                    if let Ok(dm) = download_manifest {
+                    if let Ok(_dm) = download_manifest {
                         // println!("{:#?}", dm.get_files());
                         break;
                     }
