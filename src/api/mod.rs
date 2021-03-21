@@ -22,6 +22,9 @@ use std::str::FromStr;
 /// Module holding the API types
 pub mod types;
 
+/// Various API Utils
+pub mod utils;
+
 /// Structure that holds all user data
 ///
 /// Needed for login
