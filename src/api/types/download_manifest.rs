@@ -1,6 +1,5 @@
 use flate2::read::ZlibDecoder;
 use log::{debug, error, warn};
-use num::{BigUint, Zero};
 use reqwest::Url;
 use serde::{de, Deserialize, Serialize};
 use serde_json::json;
@@ -9,7 +8,6 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::io::Read;
-use std::ops::Shl;
 use std::str::FromStr;
 
 #[allow(missing_docs)]
