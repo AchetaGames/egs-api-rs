@@ -65,10 +65,22 @@ impl AssetInfo {
     }
 
     /// Get release info based on the release id
-    pub fn get_release_id(&self, id: String) -> Option<ReleaseInfo> {
+    pub fn get_release_id(&self, id: &String) -> Option<ReleaseInfo> {
         if let Some(releases) = self.release_info.clone() {
             for release in releases {
-                if release.id.clone().unwrap_or_default() == id {
+                if release.id.clone().unwrap_or_default().eq(id) {
+                    return Some(release);
+                }
+            }
+        };
+        None
+    }
+
+    /// Get release info based on the release name
+    pub fn get_release_name(&self, name: &String) -> Option<ReleaseInfo> {
+        if let Some(releases) = self.release_info.clone() {
+            for release in releases {
+                if release.app_id.clone().unwrap_or_default().eq(name) {
                     return Some(release);
                 }
             }

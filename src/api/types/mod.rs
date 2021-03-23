@@ -15,3 +15,6 @@ pub mod library;
 
 /// Entitlement Module
 pub mod entitlement;
+
+/// Downloaded chunk module
+pub mod chunk;
