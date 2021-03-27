@@ -58,7 +58,7 @@ where
             E: de::Error,
         {
             match FromStr::from_str(v) {
-                Ok(str) => Ok(crate::api::utils::blob_to_num(str)),
+                Ok(str) => Ok(crate::api::utils::blob_to_num::<String>(str)),
                 Err(_) => Err(de::Error::custom("Could not parse Epic Blob")),
             }
         }
@@ -85,7 +85,7 @@ where
             E: de::Error,
         {
             match FromStr::from_str(v) {
-                Ok(str) => Ok(crate::api::utils::bigblob_to_num(str)
+                Ok(str) => Ok(crate::api::utils::bigblob_to_num::<String>(str)
                     .to_bytes_le()
                     .iter()
                     .map(|b| format!("{:02x}", b))

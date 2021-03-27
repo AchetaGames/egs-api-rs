@@ -1,18 +1,25 @@
-use gtk::{prelude::BuilderExtManual, Builder, Button, ButtonExt, Entry, EntryExt, Inhibit, Label, LabelExt, WidgetExt, Window, Stack, StackExt, GtkWindowExt, Box, ContainerExt, Expander, ExpanderExt, ExpanderBuilder, Image, ImageExt, Align, Separator};
-use relm_derive::Msg;
-use relm::{connect, Relm, Update, Widget, WidgetTest, Channel};
-use webbrowser;
-use egs_api::EpicGames;
-use tokio::runtime::Runtime;
-use gtk::Orientation::{Vertical, Horizontal};
-use std::collections::HashMap;
-use egs_api::api::types::{EpicAsset, AssetInfo, DownloadManifest};
-use gdk_pixbuf::PixbufLoaderExt;
-use std::thread;
-use crate::Msg::{LoginOk, ProcessAssetList, ProcessAssetInfo, ProcessImage, ProcessDownloadManifest};
+use crate::Msg::{
+    LoginOk, ProcessAssetInfo, ProcessAssetList, ProcessDownloadManifest, ProcessImage,
+};
+use egs_api::api::types::asset_info::AssetInfo;
+use egs_api::api::types::download_manifest::DownloadManifest;
+use egs_api::api::types::epic_asset::EpicAsset;
 use egs_api::api::UserData;
+use egs_api::EpicGames;
+use gdk_pixbuf::PixbufLoaderExt;
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::{
+    prelude::BuilderExtManual, Align, Box, Builder, Button, ButtonExt, ContainerExt, Entry,
+    EntryExt, Expander, ExpanderBuilder, ExpanderExt, GtkWindowExt, Image, ImageExt, Inhibit,
+    Label, LabelExt, Separator, Stack, StackExt, WidgetExt, Window,
+};
+use relm::{connect, Channel, Relm, Update, Widget, WidgetTest};
+use relm_derive::Msg;
+use std::collections::HashMap;
+use std::thread;
 use threadpool::ThreadPool;
-
+use tokio::runtime::Runtime;
+use webbrowser;
 
 struct Model {
     relm: Relm<Win>,
@@ -80,20 +87,21 @@ impl Update for Win {
             Msg::Login => {
                 let sid = self.widgets.sid.get_text();
                 let stream = self.model.relm.stream().clone();
-                let (_channel, sender) = Channel::new(move |ud| {
-                    match ud {
-                        None => {}
-                        Some(user_data) => { stream.emit(LoginOk(user_data)); }
+                let (_channel, sender) = Channel::new(move |ud| match ud {
+                    None => {}
+                    Some(user_data) => {
+                        stream.emit(LoginOk(user_data));
                     }
                 });
 
                 let mut eg = self.epic_games.clone();
                 thread::spawn(move || {
-                    match Runtime::new().unwrap().block_on(eg.auth_sid(sid.as_str()))
-                    {
+                    match Runtime::new().unwrap().block_on(eg.auth_sid(sid.as_str())) {
                         None => {}
                         Some(exchange_token) => {
-                            if Runtime::new().unwrap().block_on(eg.auth_code(exchange_token))
+                            if Runtime::new()
+                                .unwrap()
+                                .block_on(eg.auth_code(exchange_token))
                             {
                                 sender.send(Some(eg.user_details())).unwrap();
                             }
@@ -103,8 +111,18 @@ impl Update for Win {
             }
             Msg::LoginOk(user_data) => {
                 &self.epic_games.set_user_details(user_data);
-                &self.widgets.stack.set_visible_child_name("logged_in_overlay");
-                &self.widgets.login_name.set_label(&self.epic_games.user_details().display_name.unwrap().as_str());
+                &self
+                    .widgets
+                    .stack
+                    .set_visible_child_name("logged_in_overlay");
+                &self.widgets.login_name.set_label(
+                    &self
+                        .epic_games
+                        .user_details()
+                        .display_name
+                        .unwrap()
+                        .as_str(),
+                );
 
                 let stream = self.model.relm.stream().clone();
                 let (_channel, sender) = Channel::new(move |am| {
@@ -117,10 +135,20 @@ impl Update for Win {
                     let mut asset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();
                     for asset in assets {
                         match asset_map.get_mut(asset.namespace.as_str()) {
-                            None => { asset_map.insert(asset.namespace.clone(), [(asset.catalog_item_id.clone(), asset)].iter().cloned().collect()); }
-                            Some(existing) => { existing.insert(asset.catalog_item_id.clone(), asset); }
+                            None => {
+                                asset_map.insert(
+                                    asset.namespace.clone(),
+                                    [(asset.catalog_item_id.clone(), asset)]
+                                        .iter()
+                                        .cloned()
+                                        .collect(),
+                                );
+                            }
+                            Some(existing) => {
+                                existing.insert(asset.catalog_item_id.clone(), asset);
+                            }
                         };
-                    };
+                    }
                     sender.send(asset_map).unwrap();
                 });
             }
@@ -134,7 +162,9 @@ impl Update for Win {
 
                         assets_box.add(&asset_box);
                         asset_box.add(&Separator::new(gtk::Orientation::Horizontal));
-                        self.widgets.asset_boxes.insert(a.catalog_item_id.clone(), asset_box);
+                        self.widgets
+                            .asset_boxes
+                            .insert(a.catalog_item_id.clone(), asset_box);
                     }
 
                     let stream = self.model.relm.stream().clone();
@@ -160,19 +190,31 @@ impl Update for Win {
                         }
                     });
                     assets_box.show_all();
-                    let category = ExpanderBuilder::new().label(&format!("{} ({})", namespace, filtered_assets.keys().len())).child(&assets_box).build();
+                    let category = ExpanderBuilder::new()
+                        .label(&format!("{} ({})", namespace, filtered_assets.keys().len()))
+                        .child(&assets_box)
+                        .build();
                     category.set_property_expand(true);
-                    &self.widgets.assets_main_box.add(&gtk::Separator::new(Horizontal));
+                    &self
+                        .widgets
+                        .assets_main_box
+                        .add(&gtk::Separator::new(Horizontal));
                     &self.widgets.assets_main_box.add(&category);
                     &self.widgets.asset_namespaces.insert(namespace, category);
-                };
+                }
                 &self.widgets.assets_main_box.show_all();
             }
             Msg::ProcessAssetInfo(asset) => {
                 let asset_box = self.widgets.asset_boxes.get(asset.id.as_str()).unwrap();
                 let name = Label::new(None);
                 name.set_halign(Align::Start);
-                name.set_markup(format!("<b>{}</b>", glib::markup_escape_text(&asset.title.clone().unwrap_or("".to_string()))).as_str());
+                name.set_markup(
+                    format!(
+                        "<b>{}</b>",
+                        glib::markup_escape_text(&asset.title.clone().unwrap_or("".to_string()))
+                    )
+                    .as_str(),
+                );
                 asset_box.add(&name);
                 asset_box.set_margin_start(20);
                 let details_box = Box::new(Horizontal, 5);
@@ -180,17 +222,31 @@ impl Update for Win {
                 gtkimage.set_margin_start(20);
                 details_box.add(&gtkimage);
                 let info_box = Box::new(Vertical, 0);
-                let developer = Label::new(Some(format!("Developer: {}", &asset.developer.clone().unwrap_or("".into())).as_str()));
+                let developer = Label::new(Some(
+                    format!(
+                        "Developer: {}",
+                        &asset.developer.clone().unwrap_or("".into())
+                    )
+                    .as_str(),
+                ));
                 developer.set_halign(Align::Start);
                 info_box.add(&developer);
                 let description = Label::new(None);
                 description.set_halign(Align::Start);
-                description.set_markup(format!("{}", glib::markup_escape_text(&asset.description.clone().unwrap_or("".into()))).as_str());
+                description.set_markup(
+                    format!(
+                        "{}",
+                        glib::markup_escape_text(&asset.description.clone().unwrap_or("".into()))
+                    )
+                    .as_str(),
+                );
                 description.set_property_wrap(true);
                 info_box.set_property_expand(true);
                 info_box.add(&description);
                 details_box.add(&info_box);
-                self.widgets.asset_thumbnails.insert(asset.id.clone(), gtkimage);
+                self.widgets
+                    .asset_thumbnails
+                    .insert(asset.id.clone(), gtkimage);
 
                 for image in asset.key_images.clone().unwrap() {
                     if image.type_field.eq_ignore_ascii_case("Thumbnail") {
@@ -203,15 +259,13 @@ impl Update for Win {
 
                         let id = asset.id.clone();
                         thread::spawn(move || {
-                            match reqwest::blocking::get(&image.url) {
-                                Ok(response) => {
-                                    match response.bytes() {
-                                        Ok(b) => {
-                                            sender.send((id, Vec::from(b.as_ref()))).unwrap();
-                                        }
-                                        Err(_) => {}
+                            match reqwest::blocking::get(image.url) {
+                                Ok(response) => match response.bytes() {
+                                    Ok(b) => {
+                                        sender.send((id, Vec::from(b.as_ref()))).unwrap();
                                     }
-                                }
+                                    Err(_) => {}
+                                },
                                 Err(_) => {}
                             };
                         });
@@ -231,27 +285,39 @@ impl Update for Win {
                 asset_box.add(&file_expander);
                 asset_box.set_property_expand(true);
                 asset_box.show_all();
-                connect!(self.model.relm, file_expander,connect_property_expanded_notify(_), Msg::LoadDownloadManifest(asset.id.clone()));
+                connect!(
+                    self.model.relm,
+                    file_expander,
+                    connect_property_expanded_notify(_),
+                    Msg::LoadDownloadManifest(asset.id.clone())
+                );
             }
-            Msg::ProcessImage((id, b)) => {
-                match self.widgets.asset_thumbnails.get(&id) {
-                    None => {}
-                    Some(gtkimage) => {
-                        let pixbuf_loader = gdk_pixbuf::PixbufLoader::new();
-                        pixbuf_loader.write(&b).unwrap();
-                        pixbuf_loader.close().ok();
-                        gtkimage.set_from_pixbuf(pixbuf_loader.get_pixbuf().unwrap().scale_simple(60, 60, gdk_pixbuf::InterpType::Bilinear).as_ref());
-                    }
+            Msg::ProcessImage((id, b)) => match self.widgets.asset_thumbnails.get(&id) {
+                None => {}
+                Some(gtkimage) => {
+                    let pixbuf_loader = gdk_pixbuf::PixbufLoader::new();
+                    pixbuf_loader.write(&b).unwrap();
+                    pixbuf_loader.close().ok();
+                    gtkimage.set_from_pixbuf(
+                        pixbuf_loader
+                            .get_pixbuf()
+                            .unwrap()
+                            .scale_simple(60, 60, gdk_pixbuf::InterpType::Bilinear)
+                            .as_ref(),
+                    );
                 }
-            }
+            },
             Msg::LoadDownloadManifest(id) => {
-                let asset = match self.model.assets.get(id.as_str())
-                {
-                    None => { return; }
-                    Some(a) => { a.clone() }
+                let asset = match self.model.assets.get(id.as_str()) {
+                    None => {
+                        return;
+                    }
+                    Some(a) => a.clone(),
                 };
 
-                if let Some(_) = self.model.download_manifests.get(id.as_str()) { return; }
+                if let Some(_) = self.model.download_manifests.get(id.as_str()) {
+                    return;
+                }
                 let stream = self.model.relm.stream().clone();
                 let (_channel, sender) = Channel::new(move |dm| {
                     stream.emit(ProcessDownloadManifest(id.clone(), dm));
@@ -259,12 +325,21 @@ impl Update for Win {
 
                 let mut eg = self.epic_games.clone();
                 thread::spawn(move || {
-                    match Runtime::new().unwrap().block_on(eg.get_asset_manifest(None, None, None, asset)) {
+                    match Runtime::new().unwrap().block_on(eg.get_asset_manifest(
+                        None,
+                        None,
+                        Some(asset.namespace.clone()),
+                        Some(asset.catalog_item_id.clone()),
+                        Some(asset.app_name.clone()),
+                    )) {
                         None => {}
                         Some(manifest) => {
                             for elem in manifest.elements {
                                 for man in elem.manifests {
-                                    match Runtime::new().unwrap().block_on(eg.get_asset_download_manifest(man.clone())) {
+                                    match Runtime::new()
+                                        .unwrap()
+                                        .block_on(eg.get_asset_download_manifest(man.clone()))
+                                    {
                                         Ok(d) => {
                                             sender.send(d).unwrap();
                                             break;
@@ -280,8 +355,10 @@ impl Update for Win {
             ProcessDownloadManifest(id, dm) => {
                 self.model.download_manifests.insert(id.clone(), dm.clone());
                 let file_list = match self.widgets.asset_files.get(id.as_str()) {
-                    None => { return; }
-                    Some(fl) => { fl }
+                    None => {
+                        return;
+                    }
+                    Some(fl) => fl,
                 };
                 for (file, _info) in dm.get_files() {
                     let file_box = Box::new(Horizontal, 0);
@@ -324,10 +401,14 @@ impl Widget for Win {
         window.set_title("Epic Asset Browser");
         window.show_all();
 
-
         connect!(relm, get_sid_button, connect_clicked(_), Msg::GetSid);
         connect!(relm, login_button, connect_clicked(_), Msg::Login);
-        connect!(relm, window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
+        connect!(
+            relm,
+            window,
+            connect_delete_event(_, _),
+            return (Some(Msg::Quit), Inhibit(false))
+        );
 
         Win {
             model,
