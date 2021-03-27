@@ -9,14 +9,19 @@ pub struct Chunk {
     header_version: u32,
     header_size: u32,
     compressed_size: u32,
-    guid: String,
-    hash: u64,
+    /// Guid of the chunk
+    pub guid: String,
+    /// Chunk Hash
+    pub hash: u64,
     compressed: bool,
-    sha_hash: Option<Vec<u8>>,
+    /// Chunk sha hash
+    pub sha_hash: Option<Vec<u8>>,
     /// 1 = rolling hash, 2 = sha hash, 3 = both
-    hash_type: Option<u8>,
-    uncompressed_size: Option<u32>,
-    data: Vec<u8>,
+    pub hash_type: Option<u8>,
+    /// Total chunk size
+    pub uncompressed_size: Option<u32>,
+    /// Chunk data
+    pub data: Vec<u8>,
 }
 
 impl Chunk {
