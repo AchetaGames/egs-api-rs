@@ -32,12 +32,3 @@ features = ["full"]
 [dependencies.serde]
 version = "1.0.123"
 features = ["derive"]
-
-[dev-dependencies]
-gtk = "^0.9.0"
-gdk-pixbuf = "0.9.0"
-glib = "0.10.3"
-pango = "0.9.1"
-relm = "^0.21.0"
-relm-derive = "^0.21.0"
-threadpool = "1.8.1"
