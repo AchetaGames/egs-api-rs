@@ -2,12 +2,13 @@ use flate2::read::ZlibDecoder;
 use log::{debug, error, warn};
 use reqwest::Url;
 use serde::{de, Deserialize, Serialize};
-use serde_json::json;
 use sha1::{Digest, Sha1};
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::{Infallible, TryFrom, TryInto};
 use std::fmt;
 use std::io::Read;
+use std::num::{ParseIntError, TryFromIntError};
 use std::str::FromStr;
 
 #[allow(missing_docs)]
@@ -19,13 +20,13 @@ pub struct DownloadManifest {
     pub manifest_file_version: u128,
     #[serde(rename = "bIsFileData")]
     pub b_is_file_data: bool,
-    #[serde(rename = "AppID")]
-    pub app_id: String,
+    #[serde(rename = "AppID", deserialize_with = "deserialize_epic_string")]
+    pub app_id: u128,
     pub app_name_string: String,
     pub build_version_string: String,
     pub launch_exe_string: String,
     pub launch_command: String,
-    pub prereq_ids: Option<Vec<::serde_json::Value>>,
+    pub prereq_ids: Option<Vec<String>>,
     pub prereq_name: String,
     pub prereq_path: String,
     pub prereq_args: String,
@@ -244,7 +245,7 @@ impl DownloadManifest {
             base_url: None,
             manifest_file_version: 0,
             b_is_file_data: false,
-            app_id: "".to_string(),
+            app_id: 0,
             app_name_string: "".to_string(),
             build_version_string: "".to_string(),
             launch_exe_string: "".to_string(),
@@ -316,7 +317,7 @@ impl DownloadManifest {
             _ => true,
         };
         position += 1;
-        res.app_id = crate::api::utils::read_le(&buffer, &mut position).to_string();
+        res.app_id = crate::api::utils::read_le(&buffer, &mut position) as u128;
         res.app_name_string =
             crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
         res.build_version_string =
@@ -327,10 +328,10 @@ impl DownloadManifest {
             crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
 
         let entries = crate::api::utils::read_le(&buffer, &mut position);
-        let mut prereq_ids: Vec<::serde_json::Value> = Vec::new();
+        let mut prereq_ids: Vec<String> = Vec::new();
         for _ in 0..entries {
             if let Some(s) = crate::api::utils::read_fstring(&buffer, &mut position) {
-                prereq_ids.push(json!(s))
+                prereq_ids.push(s)
             }
         }
         if prereq_ids.is_empty() {
@@ -594,6 +595,172 @@ impl DownloadManifest {
         }
 
         Some(res)
+    }
+
+    /// Return a vector containing the manifest data
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        // Magic
+        result.append(1153351692u32.to_le_bytes().to_vec().borrow_mut());
+        // Header Size
+        result.append(41u32.to_le_bytes().to_vec().borrow_mut());
+
+        let mut data: Vec<u8> = Vec::new();
+        let mut meta: Vec<u8> = Vec::new();
+        // Data version
+        meta.push(if self.build_version_string.is_empty() {
+            0
+        } else {
+            1
+        });
+        // Feature level
+        match u32::try_from(self.manifest_file_version) {
+            Ok(version) => meta.append(version.to_le_bytes().to_vec().borrow_mut()),
+            Err(_) => meta.append(18u32.to_le_bytes().to_vec().borrow_mut()),
+        }
+        // is file data
+        meta.push(0);
+        // app id
+        match u32::try_from(self.app_id) {
+            Ok(version) => meta.append(version.to_le_bytes().to_vec().borrow_mut()),
+            Err(_) => meta.append(0u32.to_le_bytes().to_vec().borrow_mut()),
+        }
+
+        meta.append(crate::api::utils::write_fstring(self.app_name_string.clone()).borrow_mut());
+
+        meta.append(
+            crate::api::utils::write_fstring(self.build_version_string.clone()).borrow_mut(),
+        );
+
+        meta.append(crate::api::utils::write_fstring(self.launch_exe_string.clone()).borrow_mut());
+
+        meta.append(crate::api::utils::write_fstring(self.launch_command.clone()).borrow_mut());
+
+        match &self.prereq_ids {
+            None => meta.append(0u32.to_le_bytes().to_vec().borrow_mut()),
+            Some(prereq_ids) => {
+                meta.append(
+                    (prereq_ids.len() as u32)
+                        .to_le_bytes()
+                        .to_vec()
+                        .borrow_mut(),
+                );
+                for prereq_id in prereq_ids {
+                    meta.append(crate::api::utils::write_fstring(prereq_id.clone()).borrow_mut());
+                }
+            }
+        }
+
+        meta.append(crate::api::utils::write_fstring(self.prereq_name.clone()).borrow_mut());
+
+        meta.append(crate::api::utils::write_fstring(self.prereq_path.clone()).borrow_mut());
+
+        meta.append(crate::api::utils::write_fstring(self.prereq_args.clone()).borrow_mut());
+
+        if !self.build_version_string.is_empty() {
+            meta.append(
+                crate::api::utils::write_fstring(self.build_version_string.clone()).borrow_mut(),
+            );
+        }
+        // Meta Size
+        data.append(
+            ((meta.len() + 4) as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+        data.append(meta.borrow_mut());
+
+        // Chunks
+
+        let mut chunks: Vec<u8> = Vec::new();
+
+        // version
+        chunks.push(0);
+
+        // count
+        chunks.append(
+            (self.chunk_hash_list.len() as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+
+        for (chunk, _) in &self.chunk_hash_list {
+            let subs = chunk
+                .as_bytes()
+                .chunks(8)
+                .map(std::str::from_utf8)
+                .collect::<Result<Vec<&str>, _>>()
+                .unwrap();
+            for g in subs {
+                chunks.append(
+                    u32::from_str_radix(g, 16)
+                        .unwrap()
+                        .to_le_bytes()
+                        .to_vec()
+                        .borrow_mut(),
+                )
+            }
+        }
+
+        // TODO: PROBABLY SORT THE CHUNKS SO WE GUARANTEE THE ORDER
+
+        for (_, hash) in &self.chunk_hash_list {
+            match u64::try_from(*hash) {
+                Ok(h) => chunks.append(h.to_le_bytes().to_vec().borrow_mut()),
+                Err(_) => chunks.append((0 as u64).to_le_bytes().to_vec().borrow_mut()),
+            }
+        }
+
+        for (_, sha) in self.chunk_sha_list.as_ref().unwrap() {
+            match crate::api::utils::decode_hex(sha.as_str()) {
+                Ok(mut s) => chunks.append(s.borrow_mut()),
+                Err(_) => chunks.append(vec![0u8; 20].borrow_mut()),
+            }
+        }
+
+        for (_, group) in &self.data_group_list {
+            chunks.append(
+                u8::try_from(*group)
+                    .unwrap_or_default()
+                    .to_le_bytes()
+                    .to_vec()
+                    .borrow_mut(),
+            )
+        }
+
+        // TODO: THIS IS WRONG THIS SHOULD BE UNCOMPRESSED SIZE, CAN BE PROBABLY GOT FROM THE FILE MANIFEST
+        for (_, window) in &self.chunk_filesize_list {
+            chunks.append(u32::try_from(*window).unwrap_or_default().to_le_bytes().to_vec().borrow_mut())
+        }
+        // File Size
+        for (_, file) in &self.chunk_filesize_list {
+            chunks.append(i64::try_from(*file).unwrap_or_default().to_le_bytes().to_vec().borrow_mut())
+        }
+
+        // Adding chunks to data
+        // add chunk size
+        data.append(((chunks.len()+4) as u32).to_le_bytes().to_vec().borrow_mut());
+        data.append(chunks.borrow_mut());
+
+        // FINISHING METADATA (Probably done)
+
+        let mut hasher = Sha1::new();
+        hasher.update(&data);
+
+        // Size uncompressed
+        result.append((data.len() as u32).to_le_bytes().to_vec().borrow_mut());
+        // Size compressed
+        result.append((data.len() as u32).to_le_bytes().to_vec().borrow_mut());
+        // Sha Hash
+        result.append(hasher.finalize().to_vec().borrow_mut());
+        // Stored as (Compressed)
+        result.push(0);
+        // Version
+        result.append(18u32.to_le_bytes().to_vec().borrow_mut());
+        result.append(data.borrow_mut());
+        result
     }
 }
 

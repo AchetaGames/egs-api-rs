@@ -1,6 +1,8 @@
 use num::{BigUint, Zero};
 use std::convert::TryInto;
 use std::ops::Shl;
+use std::borrow::BorrowMut;
+use std::num::ParseIntError;
 
 /// Convert numbers in the Download Manifest from little indian and %03d concatenated string
 pub fn blob_to_num<T: Into<String>>(str: T) -> u128 {
@@ -80,6 +82,30 @@ pub(crate) fn read_fstring(buffer: &Vec<u8>, position: &mut usize) -> Option<Str
     } else {
         None
     }
+}
+
+pub(crate) fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
+
+pub(crate) fn write_fstring(string: String) -> Vec<u8> {
+    let mut meta: Vec<u8> = Vec::new();
+    if !string.is_empty() {
+        meta.append(
+            ((string.len() + 1) as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+        meta.append(string.clone().into_bytes().borrow_mut());
+        meta.push(0);
+    } else {
+        meta.append(0u32.to_le_bytes().to_vec().borrow_mut())
+    }
+    meta
 }
 
 #[cfg(test)]
