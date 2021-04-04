@@ -1,14 +1,15 @@
 use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use log::{debug, error, warn};
 use reqwest::Url;
 use serde::{de, Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::convert::{Infallible, TryFrom, TryInto};
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
-use std::io::Read;
-use std::num::{ParseIntError, TryFromIntError};
+use std::io::{Read, Write};
 use std::str::FromStr;
 
 #[allow(missing_docs)]
@@ -86,11 +87,14 @@ where
             E: de::Error,
         {
             match FromStr::from_str(v) {
-                Ok(str) => Ok(crate::api::utils::bigblob_to_num::<String>(str)
-                    .to_bytes_le()
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>()),
+                Ok(str) => {
+                    let mut res = crate::api::utils::bigblob_to_num::<String>(str).to_bytes_le();
+                    if res.len() < 20 {
+                        res.resize(20, 0);
+                    }
+
+                    Ok(res.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+                }
                 Err(_) => Err(de::Error::custom("Could not parse Epic Blob")),
             }
         }
@@ -485,6 +489,7 @@ impl DownloadManifest {
             }
         }
 
+        // File Chunks
         for i in 0..count {
             if let Some(file) = files.get_mut(i as usize) {
                 let elem_count = crate::api::utils::read_le(&buffer, &mut position);
@@ -600,10 +605,6 @@ impl DownloadManifest {
     /// Return a vector containing the manifest data
     pub fn to_vec(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
-        // Magic
-        result.append(1153351692u32.to_le_bytes().to_vec().borrow_mut());
-        // Header Size
-        result.append(41u32.to_le_bytes().to_vec().borrow_mut());
 
         let mut data: Vec<u8> = Vec::new();
         let mut meta: Vec<u8> = Vec::new();
@@ -732,34 +733,192 @@ impl DownloadManifest {
 
         // TODO: THIS IS WRONG THIS SHOULD BE UNCOMPRESSED SIZE, CAN BE PROBABLY GOT FROM THE FILE MANIFEST
         for (_, window) in &self.chunk_filesize_list {
-            chunks.append(u32::try_from(*window).unwrap_or_default().to_le_bytes().to_vec().borrow_mut())
+            chunks.append(
+                u32::try_from(*window)
+                    .unwrap_or_default()
+                    .to_le_bytes()
+                    .to_vec()
+                    .borrow_mut(),
+            )
         }
         // File Size
         for (_, file) in &self.chunk_filesize_list {
-            chunks.append(i64::try_from(*file).unwrap_or_default().to_le_bytes().to_vec().borrow_mut())
+            chunks.append(
+                i64::try_from(*file)
+                    .unwrap_or_default()
+                    .to_le_bytes()
+                    .to_vec()
+                    .borrow_mut(),
+            )
         }
 
         // Adding chunks to data
         // add chunk size
-        data.append(((chunks.len()+4) as u32).to_le_bytes().to_vec().borrow_mut());
+        data.append(
+            ((chunks.len() + 4) as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
         data.append(chunks.borrow_mut());
+
+        // File Manifest
+
+        let mut files: Vec<u8> = Vec::new();
+        // version
+        files.push(0);
+
+        // count
+        files.append(
+            (self.file_manifest_list.len() as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+
+        // Filenames
+        for file in &self.file_manifest_list {
+            files.append(crate::api::utils::write_fstring(file.filename.clone()).borrow_mut());
+        }
+
+        // Symlink target
+        // TODO: Figure out what Epic puts in theirs
+        for _ in &self.file_manifest_list {
+            files.append(crate::api::utils::write_fstring("".to_string()).borrow_mut());
+        }
+
+        // hash
+        for file in &self.file_manifest_list {
+            match crate::api::utils::decode_hex(file.file_hash.as_str()) {
+                Ok(mut s) => files.append(s.borrow_mut()),
+                Err(_) => files.append(vec![0u8; 20].borrow_mut()),
+            }
+        }
+
+        // flags
+        // TODO: Figure out what Epic puts in theirs
+        for _ in &self.file_manifest_list {
+            files.push(0);
+        }
+
+        // install tags
+        // TODO: Figure out what Epic puts in theirs
+        for _ in &self.file_manifest_list {
+            files.append(0u32.to_le_bytes().to_vec().borrow_mut());
+            // files.append(crate::api::utils::write_fstring("".to_string()).borrow_mut());
+        }
+
+        // File Chunks
+        for file in &self.file_manifest_list {
+            files.append(
+                (file.file_chunk_parts.len() as u32)
+                    .to_le_bytes()
+                    .to_vec()
+                    .borrow_mut(),
+            );
+            for chunk_part in &file.file_chunk_parts {
+                files.append(28u32.to_le_bytes().to_vec().borrow_mut());
+                let subs = chunk_part
+                    .guid
+                    .as_bytes()
+                    .chunks(8)
+                    .map(std::str::from_utf8)
+                    .collect::<Result<Vec<&str>, _>>()
+                    .unwrap();
+                for g in subs {
+                    files.append(
+                        u32::from_str_radix(g, 16)
+                            .unwrap()
+                            .to_le_bytes()
+                            .to_vec()
+                            .borrow_mut(),
+                    )
+                }
+                match u32::try_from(chunk_part.offset) {
+                    Ok(offset) => files.append(offset.to_le_bytes().to_vec().borrow_mut()),
+                    Err(_) => files.append(0u32.to_le_bytes().to_vec().borrow_mut()),
+                }
+                match u32::try_from(chunk_part.size) {
+                    Ok(size) => files.append(size.to_le_bytes().to_vec().borrow_mut()),
+                    Err(_) => files.append(0u32.to_le_bytes().to_vec().borrow_mut()),
+                }
+            }
+        }
+
+        // Adding File manifest to data
+        data.append(
+            ((files.len() + 4) as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+        data.append(files.borrow_mut());
+
+        // Custom Fields
+
+        let mut custom: Vec<u8> = Vec::new();
+        // version
+        custom.push(0);
+
+        match &self.custom_fields {
+            None => {
+                custom.push(0);
+            }
+            Some(custom_fields) => {
+                // count
+                custom.append(
+                    (custom_fields.len() as u32)
+                        .to_le_bytes()
+                        .to_vec()
+                        .borrow_mut(),
+                );
+
+                for (key, _) in custom_fields {
+                    custom.append(crate::api::utils::write_fstring(key.to_string()).borrow_mut());
+                }
+                for (_, value) in custom_fields {
+                    custom.append(crate::api::utils::write_fstring(value.to_string()).borrow_mut());
+                }
+            }
+        }
+
+        // Adding Custom Feilds to data
+        data.append(
+            ((custom.len() + 4) as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
+        data.append(custom.borrow_mut());
 
         // FINISHING METADATA (Probably done)
 
         let mut hasher = Sha1::new();
         hasher.update(&data);
 
+        // Magic
+        result.append(1153351692u32.to_le_bytes().to_vec().borrow_mut());
+        // Header Size
+        result.append(41u32.to_le_bytes().to_vec().borrow_mut());
         // Size uncompressed
         result.append((data.len() as u32).to_le_bytes().to_vec().borrow_mut());
         // Size compressed
-        result.append((data.len() as u32).to_le_bytes().to_vec().borrow_mut());
+        let mut z = ZlibEncoder::new(Vec::new(), Compression::default());
+        z.write_all(&data).unwrap();
+        let mut compressed = z.finish().unwrap();
+        result.append(
+            (compressed.len() as u32)
+                .to_le_bytes()
+                .to_vec()
+                .borrow_mut(),
+        );
         // Sha Hash
         result.append(hasher.finalize().to_vec().borrow_mut());
         // Stored as (Compressed)
-        result.push(0);
+        result.push(1);
         // Version
         result.append(18u32.to_le_bytes().to_vec().borrow_mut());
-        result.append(data.borrow_mut());
+        result.append(compressed.borrow_mut());
         result
     }
 }
