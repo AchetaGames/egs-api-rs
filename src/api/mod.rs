@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 
 use chrono::{DateTime, Utc};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, ClientBuilder, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
@@ -291,6 +291,26 @@ impl EpicAPI {
                 Err(EpicAPIError::Unknown)
             }
         }
+    }
+
+    pub async fn invalidate_sesion(&mut self) -> bool {
+        match &self.user_data.access_token {
+            None => {}
+            Some(access_token) => {
+                let url = format!("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}", access_token);
+                let client = EpicAPI::build_client().build().unwrap();
+                match client.delete(Url::from_str(&url).unwrap()).send().await {
+                    Ok(_) => {
+                        info!("Session invalidated");
+                        return true;
+                    }
+                    Err(e) => {
+                        warn!("Unable to invalidate session: {}", e)
+                    }
+                }
+            }
+        };
+        return false;
     }
 
     pub async fn get_assets(

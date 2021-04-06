@@ -150,6 +150,11 @@ impl EpicGames {
         }
     }
 
+    /// Invalidate existing session
+    pub async fn logout(&mut self) -> bool {
+        self.egs.invalidate_sesion().await
+    }
+
     /// Perform login based on previous authentication
     pub async fn login(&mut self) -> bool {
         match self.egs.user_data.expires_at {
