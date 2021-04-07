@@ -54,6 +54,29 @@ pub struct UserData {
 }
 
 impl UserData {
+    /// Creates new UserData Structure
+    pub fn new() -> Self {
+        UserData {
+            access_token: None,
+            expires_in: None,
+            expires_at: None,
+            token_type: None,
+            refresh_token: None,
+            refresh_expires: None,
+            refresh_expires_at: None,
+            account_id: None,
+            client_id: None,
+            internal_client: None,
+            client_service: None,
+            display_name: None,
+            app: None,
+            in_app_id: None,
+            device_id: None,
+            error_message: None,
+            error_code: None
+        }
+    }
+
     /// Updates only the present values in the existing user data
     pub fn update(&mut self, new: UserData) {
         if let Some(n) = new.access_token {
