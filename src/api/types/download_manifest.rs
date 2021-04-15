@@ -132,7 +132,7 @@ where
 
 impl DownloadManifest {
     /// Get chunk dir based on the manifest version
-    fn get_chunk_dir(version: u128) -> &'static str {
+    fn chunk_dir(version: u128) -> &'static str {
         if version >= 15 {
             "ChunksV4"
         } else if version >= 6 {
@@ -145,7 +145,7 @@ impl DownloadManifest {
     }
 
     /// Get the download links from the downloaded manifest
-    fn get_download_links(&self) -> HashMap<String, Url> {
+    fn download_links(&self) -> HashMap<String, Url> {
         let url = match self.base_url.clone() {
             None => {
                 return HashMap::new();
@@ -153,7 +153,7 @@ impl DownloadManifest {
             Some(uri) => uri,
         };
 
-        let chunk_dir = DownloadManifest::get_chunk_dir(self.manifest_file_version);
+        let chunk_dir = DownloadManifest::chunk_dir(self.manifest_file_version);
         let mut result: HashMap<String, Url> = HashMap::new();
 
         for (guid, hash) in self.chunk_hash_list.clone() {
@@ -180,11 +180,11 @@ impl DownloadManifest {
     }
 
     /// Get list of files in the manifest
-    pub fn get_files(&self) -> HashMap<String, FileManifestList> {
+    pub fn files(&self) -> HashMap<String, FileManifestList> {
         let mut result: HashMap<String, FileManifestList> = HashMap::new();
         let links = match self.base_url.clone() {
             None => HashMap::new(),
-            Some(_) => self.get_download_links(),
+            Some(_) => self.download_links(),
         };
 
         for file in self.file_manifest_list.clone() {
@@ -217,7 +217,7 @@ impl DownloadManifest {
     }
 
     /// Get total size of files in the manifest
-    pub fn get_total_size(&self) -> u128 {
+    pub fn total_size(&self) -> u128 {
         let mut total: u128 = 0;
         for (_, size) in &self.chunk_filesize_list {
             total += size.clone();

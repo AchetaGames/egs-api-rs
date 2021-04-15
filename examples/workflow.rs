@@ -65,7 +65,7 @@ async fn main() {
                 .last()
                 .unwrap()
                 .to_owned();
-            egs.get_asset_manifest(
+            egs.asset_manifest(
                 None,
                 None,
                 Some(test_asset.namespace.clone()),
@@ -78,7 +78,7 @@ async fn main() {
             let mut categories: HashSet<String> = HashSet::new();
             for (_guid, asset) in non_ueasset_map.clone() {
                 match egs
-                    .get_asset_info(asset.values().last().unwrap().to_owned())
+                    .asset_info(asset.values().last().unwrap().to_owned())
                     .await
                 {
                     None => {}
@@ -94,18 +94,18 @@ async fn main() {
             for category in cat {
                 println!("{}", category);
             }
-            let _asset_info = egs.get_asset_info(test_asset.clone()).await;
+            let _asset_info = egs.asset_info(test_asset.clone()).await;
             println!("Getting ownership token");
-            egs.get_ownership_token(test_asset.clone()).await;
+            egs.ownership_token(test_asset.clone()).await;
             println!("Getting the game token");
-            egs.get_game_token().await;
+            egs.game_token().await;
             println!("Getting the entitlements");
-            egs.get_user_entitlements().await;
+            egs.user_entitlements().await;
             println!("Getting the library items");
-            egs.get_library_items(true).await;
+            egs.library_items(true).await;
             println!("Getting Asset manifest");
             let manifest = egs
-                .get_asset_manifest(
+                .asset_manifest(
                     None,
                     None,
                     Some(test_asset.namespace.clone()),
@@ -116,7 +116,7 @@ async fn main() {
             println!("{:?}", manifest);
             for elem in manifest.unwrap().elements {
                 for man in elem.manifests {
-                    let download_manifest = egs.get_asset_download_manifest(man).await;
+                    let download_manifest = egs.asset_download_manifest(man).await;
                     if let Ok(_dm) = download_manifest {
                         // println!("{:#?}", dm.get_files());
                         break;
