@@ -216,11 +216,20 @@ impl DownloadManifest {
         return result;
     }
 
-    /// Get total size of files in the manifest
-    pub fn total_size(&self) -> u128 {
+    /// Get total size of chunks in the manifest
+    pub fn total_download_size(&self) -> u128 {
         let mut total: u128 = 0;
         for (_, size) in &self.chunk_filesize_list {
             total += size.clone();
+        }
+        total
+    }
+
+    /// Get total size of chunks in the manifest
+    pub fn total_size(&self) -> u128 {
+        let mut total: u128 = 0;
+        for f in &self.file_manifest_list {
+            total += f.size();
         }
         total
     }
@@ -933,7 +942,16 @@ pub struct FileManifestList {
     pub file_chunk_parts: Vec<FileChunkPart>,
 }
 
-// TODO: Write deserialization so offset and size are converted to u128
+impl FileManifestList {
+    /// Get File Size
+    pub fn size(&self) -> u128 {
+        self.file_chunk_parts
+            .iter()
+            .map(|part| part.size)
+            .sum::<u128>()
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]

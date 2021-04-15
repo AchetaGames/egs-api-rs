@@ -274,7 +274,7 @@ impl EpicGames {
     /// Returns a DownloadManifest for a specified file manifest
     pub async fn asset_download_manifest(
         &self,
-        manifest: Manifest,
+        manifest: AssetManifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
         match self.egs.asset_download_manifest(manifest).await {
             Ok(manifest) => Ok(manifest),

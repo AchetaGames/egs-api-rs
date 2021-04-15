@@ -17,6 +17,7 @@ use types::entitlement::Entitlement;
 use types::library::Library;
 
 use crate::api::types::epic_asset::EpicAsset;
+use std::collections::hash_map::RandomState;
 use std::str::FromStr;
 
 /// Module holding the API types
@@ -73,7 +74,7 @@ impl UserData {
             in_app_id: None,
             device_id: None,
             error_message: None,
-            error_code: None
+            error_code: None,
         }
     }
 
@@ -425,59 +426,67 @@ impl EpicAPI {
 
     pub async fn asset_download_manifest(
         &self,
-        manifest: Manifest,
+        asset_manifest: AssetManifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
-        let mut queries: Vec<String> = Vec::new();
-        debug!("{:?}", manifest);
-        for query in manifest.query_params {
-            queries.push(format!("{}={}", query.name, query.value));
-        }
-        let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
-        let client = EpicAPI::build_client().build().unwrap();
-        match client.get(Url::from_str(&url).unwrap()).send().await {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.bytes().await {
-                        Ok(data) => match DownloadManifest::parse(data.to_vec()) {
-                            None => {
-                                error!("Unable to parse the Download Manifest");
-                                Err(EpicAPIError::Unknown)
+        for manifest in elem.manifests {
+            let mut queries: Vec<String> = Vec::new();
+            debug!("{:?}", manifest);
+            for query in manifest.query_params {
+                queries.push(format!("{}={}", query.name, query.value));
+            }
+            let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
+            let client = EpicAPI::build_client().build().unwrap();
+            match client.get(Url::from_str(&url).unwrap()).send().await {
+                Ok(response) => {
+                    if response.status() == reqwest::StatusCode::OK {
+                        match response.bytes().await {
+                            Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                                None => {
+                                    error!("Unable to parse the Download Manifest");
+                                    return Err(EpicAPIError::Unknown)
+                                }
+                                Some(mut man) => {
+                                    let mut url = manifest.uri.clone();
+                                    url.set_path(&match url.path_segments() {
+                                        None => "".to_string(),
+                                        Some(segments) => {
+                                            let mut vec: Vec<&str> = segments.collect();
+                                            vec.remove(vec.len() - 1);
+                                            vec.join("/")
+                                        }
+                                    });
+                                    url.set_query(None);
+                                    url.set_fragment(None);
+                                    let mut custom_fields = match &man.custom_fields {
+                                        None => HashMap::new(),
+                                        Some(fields) => fields.clone(),
+                                    };
+
+                                    man.base_url = Some(url);
+                                    return Ok(man)
+                                }
+                            },
+                            Err(e) => {
+                                error!("{:?}", e);
+                                return Err(EpicAPIError::Unknown)
                             }
-                            Some(mut man) => {
-                                let mut url = manifest.uri.clone();
-                                url.set_path(&match url.path_segments() {
-                                    None => "".to_string(),
-                                    Some(segments) => {
-                                        let mut vec: Vec<&str> = segments.collect();
-                                        vec.remove(vec.len() - 1);
-                                        vec.join("/")
-                                    }
-                                });
-                                url.set_query(None);
-                                url.set_fragment(None);
-                                man.base_url = Some(url);
-                                Ok(man)
-                            }
-                        },
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
                         }
+                    } else {
+                        warn!(
+                            "{} result: {}",
+                            response.status(),
+                            response.text().await.unwrap()
+                        );
+                        return Err(EpicAPIError::Unknown)
                     }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
+                }
+                Err(e) => {
+                    error!("{:?}", e);
+                    return Err(EpicAPIError::Unknown)
                 }
             }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
-        }
+        };
+        Err(EpicAPIError::Unknown)
     }
 
     pub async fn asset_info(
@@ -550,10 +559,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn ownership_token(
-        &self,
-        asset: EpicAsset,
-    ) -> Result<OwnershipToken, EpicAPIError> {
+    pub async fn ownership_token(&self, asset: EpicAsset) -> Result<OwnershipToken, EpicAPIError> {
         let url = match &self.user_data.account_id {
             None => {
                 return Err(EpicAPIError::InvalidCredentials);
@@ -637,10 +643,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn library_items(
-        &mut self,
-        include_metadata: bool,
-    ) -> Result<Library, EpicAPIError> {
+    pub async fn library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
         let mut library = Library {
             records: vec![],
             response_metadata: Default::default(),
