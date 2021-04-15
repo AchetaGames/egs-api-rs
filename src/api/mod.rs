@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
-use types::asset_manifest::{AssetManifest, Manifest};
+use types::asset_manifest::AssetManifest;
 use types::download_manifest::DownloadManifest;
 use types::entitlement::Entitlement;
 use types::library::Library;
 
 use crate::api::types::epic_asset::EpicAsset;
-use std::collections::hash_map::RandomState;
 use std::str::FromStr;
 
 /// Module holding the API types
@@ -393,7 +392,7 @@ impl EpicAPI {
             return Err(EpicAPIError::InvalidParams);
         };
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.unwrap_or("Windows".to_string()), namespace.unwrap(), item_id.unwrap(), app.unwrap(), label.unwrap_or("Live".to_string()));
+                          platform.clone().unwrap_or("Windows".to_string()), namespace.clone().unwrap(), item_id.clone().unwrap(), app.clone().unwrap(), label.clone().unwrap_or("Live".to_string()));
         match self
             .authorized_get_client(Url::parse(&url).unwrap())
             .send()
@@ -401,8 +400,15 @@ impl EpicAPI {
         {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(manifest) => Ok(manifest),
+                    match response.json::<AssetManifest>().await {
+                        Ok(mut manifest) => {
+                            manifest.platform = platform;
+                            manifest.label = label;
+                            manifest.namespace = namespace;
+                            manifest.item_id = item_id;
+                            manifest.app = app;
+                            Ok(manifest)
+                        }
                         Err(e) => {
                             error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
@@ -428,64 +434,91 @@ impl EpicAPI {
         &self,
         asset_manifest: AssetManifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
-        for manifest in elem.manifests {
-            let mut queries: Vec<String> = Vec::new();
-            debug!("{:?}", manifest);
-            for query in manifest.query_params {
-                queries.push(format!("{}={}", query.name, query.value));
-            }
-            let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
-            let client = EpicAPI::build_client().build().unwrap();
-            match client.get(Url::from_str(&url).unwrap()).send().await {
-                Ok(response) => {
-                    if response.status() == reqwest::StatusCode::OK {
-                        match response.bytes().await {
-                            Ok(data) => match DownloadManifest::parse(data.to_vec()) {
-                                None => {
-                                    error!("Unable to parse the Download Manifest");
-                                    return Err(EpicAPIError::Unknown)
-                                }
-                                Some(mut man) => {
-                                    let mut url = manifest.uri.clone();
-                                    url.set_path(&match url.path_segments() {
-                                        None => "".to_string(),
-                                        Some(segments) => {
-                                            let mut vec: Vec<&str> = segments.collect();
-                                            vec.remove(vec.len() - 1);
-                                            vec.join("/")
+        let base_urls = asset_manifest.url_csv();
+        for elem in asset_manifest.elements {
+            for manifest in elem.manifests {
+                let mut queries: Vec<String> = Vec::new();
+                debug!("{:?}", manifest);
+                for query in manifest.query_params {
+                    queries.push(format!("{}={}", query.name, query.value));
+                }
+                let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
+                let client = EpicAPI::build_client().build().unwrap();
+                match client.get(Url::from_str(&url).unwrap()).send().await {
+                    Ok(response) => {
+                        if response.status() == reqwest::StatusCode::OK {
+                            match response.bytes().await {
+                                Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                                    None => {
+                                        error!("Unable to parse the Download Manifest");
+                                        return Err(EpicAPIError::Unknown);
+                                    }
+                                    Some(mut man) => {
+                                        let mut url = manifest.uri.clone();
+                                        url.set_path(&match url.path_segments() {
+                                            None => "".to_string(),
+                                            Some(segments) => {
+                                                let mut vec: Vec<&str> = segments.collect();
+                                                vec.remove(vec.len() - 1);
+                                                vec.join("/")
+                                            }
+                                        });
+                                        url.set_query(None);
+                                        url.set_fragment(None);
+                                        let mut custom_fields = match &man.custom_fields {
+                                            None => HashMap::new(),
+                                            Some(fields) => fields.clone(),
+                                        };
+                                        custom_fields
+                                            .insert("BaseUrl".to_string(), base_urls.clone());
+                                        if let Some(id) = asset_manifest.item_id {
+                                            custom_fields
+                                                .insert("CatalogItemId".to_string(), id.clone());
                                         }
-                                    });
-                                    url.set_query(None);
-                                    url.set_fragment(None);
-                                    let mut custom_fields = match &man.custom_fields {
-                                        None => HashMap::new(),
-                                        Some(fields) => fields.clone(),
-                                    };
+                                        if let Some(label) = asset_manifest.label {
+                                            custom_fields
+                                                .insert("BuildLabel".to_string(), label.clone());
+                                        }
+                                        if let Some(ns) = asset_manifest.namespace {
+                                            custom_fields
+                                                .insert("CatalogNamespace".to_string(), ns.clone());
+                                        }
 
-                                    man.base_url = Some(url);
-                                    return Ok(man)
+                                        if let Some(app) = asset_manifest.app {
+                                            custom_fields.insert(
+                                                "CatalogAssetName".to_string(),
+                                                app.clone(),
+                                            );
+                                        }
+
+                                        println!("{:?}", custom_fields);
+                                        man.custom_fields = Some(custom_fields);
+
+                                        man.base_url = Some(url);
+                                        return Ok(man);
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("{:?}", e);
+                                    return Err(EpicAPIError::Unknown);
                                 }
-                            },
-                            Err(e) => {
-                                error!("{:?}", e);
-                                return Err(EpicAPIError::Unknown)
                             }
+                        } else {
+                            warn!(
+                                "{} result: {}",
+                                response.status(),
+                                response.text().await.unwrap()
+                            );
+                            return Err(EpicAPIError::Unknown);
                         }
-                    } else {
-                        warn!(
-                            "{} result: {}",
-                            response.status(),
-                            response.text().await.unwrap()
-                        );
-                        return Err(EpicAPIError::Unknown)
+                    }
+                    Err(e) => {
+                        error!("{:?}", e);
+                        return Err(EpicAPIError::Unknown);
                     }
                 }
-                Err(e) => {
-                    error!("{:?}", e);
-                    return Err(EpicAPIError::Unknown)
-                }
             }
-        };
+        }
         Err(EpicAPIError::Unknown)
     }
 

@@ -114,14 +114,10 @@ async fn main() {
                 )
                 .await;
             println!("{:?}", manifest);
-            for elem in manifest.unwrap().elements {
-                for man in elem.manifests {
-                    let download_manifest = egs.asset_download_manifest(man).await;
-                    if let Ok(_dm) = download_manifest {
-                        // println!("{:#?}", dm.get_files());
-                        break;
-                    }
-                }
+
+            let download_manifest = egs.asset_download_manifest(manifest.unwrap()).await;
+            if let Ok(_dm) = download_manifest {
+                // println!("{:#?}", dm.get_files());
             }
         }
     }

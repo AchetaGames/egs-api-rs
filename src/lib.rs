@@ -23,7 +23,7 @@ use reqwest::header;
 use log::{error,info,warn};
 
 use api::types::asset_info::{AssetInfo, GameToken};
-use api::types::asset_manifest::{AssetManifest, Manifest};
+use api::types::asset_manifest::{AssetManifest};
 use api::types::download_manifest::DownloadManifest;
 use api::types::library::Library;
 use api::types::entitlement::Entitlement;
