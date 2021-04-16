@@ -465,36 +465,42 @@ impl EpicAPI {
                                         });
                                         url.set_query(None);
                                         url.set_fragment(None);
-                                        let mut custom_fields = match &man.custom_fields {
-                                            None => HashMap::new(),
-                                            Some(fields) => fields.clone(),
-                                        };
-                                        custom_fields
-                                            .insert("BaseUrl".to_string(), base_urls.clone());
+                                        man.set_custom_field(
+                                            "BaseUrl".to_string(),
+                                            base_urls.clone(),
+                                        );
+
                                         if let Some(id) = asset_manifest.item_id {
-                                            custom_fields
-                                                .insert("CatalogItemId".to_string(), id.clone());
+                                            man.set_custom_field(
+                                                "CatalogItemId".to_string(),
+                                                id.clone(),
+                                            );
                                         }
                                         if let Some(label) = asset_manifest.label {
-                                            custom_fields
-                                                .insert("BuildLabel".to_string(), label.clone());
+                                            man.set_custom_field(
+                                                "BuildLabel".to_string(),
+                                                label.clone(),
+                                            );
                                         }
                                         if let Some(ns) = asset_manifest.namespace {
-                                            custom_fields
-                                                .insert("CatalogNamespace".to_string(), ns.clone());
+                                            man.set_custom_field(
+                                                "CatalogNamespace".to_string(),
+                                                ns.clone(),
+                                            );
                                         }
 
                                         if let Some(app) = asset_manifest.app {
-                                            custom_fields.insert(
+                                            man.set_custom_field(
                                                 "CatalogAssetName".to_string(),
                                                 app.clone(),
                                             );
                                         }
 
-                                        println!("{:?}", custom_fields);
-                                        man.custom_fields = Some(custom_fields);
-
-                                        man.base_url = Some(url);
+                                        println!("{:#?}", man.custom_fields);
+                                        man.set_custom_field(
+                                            "SourceURL".to_string(),
+                                            url.to_string(),
+                                        );
                                         return Ok(man);
                                     }
                                 },

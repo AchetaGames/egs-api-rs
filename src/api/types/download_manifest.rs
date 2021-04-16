@@ -16,7 +16,6 @@ use std::str::FromStr;
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DownloadManifest {
-    pub base_url: Option<Url>,
     #[serde(deserialize_with = "deserialize_epic_string")]
     pub manifest_file_version: u128,
     #[serde(rename = "bIsFileData")]
@@ -144,12 +143,41 @@ impl DownloadManifest {
         }
     }
 
+    pub(crate) fn set_custom_field(&mut self, key: String, value: String) {
+        if let Some(fields) = self.custom_fields.as_mut() {
+            fields.insert(key, value);
+        } else {
+            self.custom_fields = Some([(key, value)].iter().cloned().collect())
+        };
+    }
+
+    pub(crate) fn custom_field(&self, key: &str) -> Option<String> {
+        match &self.custom_fields {
+            Some(fields) => match fields.get(key) {
+                None => None,
+                Some(v) => Some(v.clone()),
+            },
+            None => None,
+        }
+    }
+
     /// Get the download links from the downloaded manifest
-    fn download_links(&self) -> HashMap<String, Url> {
-        let url = match self.base_url.clone() {
-            None => {
-                return HashMap::new();
-            }
+    fn download_links(&self) -> Option<HashMap<String, Url>> {
+        let url = match self.custom_field("SourceURL") {
+            None => match self.custom_field("BaseUrl") {
+                None => {
+                    return None;
+                }
+                Some(urls) => {
+                    let split = urls.split(',').collect::<Vec<&str>>();
+                    match split.first() {
+                        None => {
+                            return None;
+                        }
+                        Some(uri) => uri.to_string(),
+                    }
+                }
+            },
             Some(uri) => uri,
         };
 
@@ -167,24 +195,20 @@ impl DownloadManifest {
                 guid.clone(),
                 Url::parse(&format!(
                     "{}/{}/{:02}/{:016X}_{}.chunk",
-                    url.as_str(),
-                    chunk_dir,
-                    group_num,
-                    hash,
-                    guid
+                    url, chunk_dir, group_num, hash, guid
                 ))
                 .unwrap(),
             );
         }
-        result
+        Some(result)
     }
 
     /// Get list of files in the manifest
     pub fn files(&self) -> HashMap<String, FileManifestList> {
         let mut result: HashMap<String, FileManifestList> = HashMap::new();
-        let links = match self.base_url.clone() {
+        let links = match self.download_links() {
             None => HashMap::new(),
-            Some(_) => self.download_links(),
+            Some(l) => l,
         };
 
         for file in self.file_manifest_list.clone() {
@@ -255,7 +279,6 @@ impl DownloadManifest {
     /// Creates the structure from binary data
     pub fn from_vec(mut buffer: Vec<u8>) -> Option<DownloadManifest> {
         let mut res = DownloadManifest {
-            base_url: None,
             manifest_file_version: 0,
             b_is_file_data: false,
             app_id: 0,
