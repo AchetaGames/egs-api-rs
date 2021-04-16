@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
-use types::asset_manifest::{AssetManifest, Manifest};
+use types::asset_manifest::AssetManifest;
 use types::download_manifest::DownloadManifest;
 use types::entitlement::Entitlement;
 use types::library::Library;
@@ -73,7 +73,7 @@ impl UserData {
             in_app_id: None,
             device_id: None,
             error_message: None,
-            error_code: None
+            error_code: None,
         }
     }
 
@@ -277,12 +277,12 @@ impl EpicAPI {
         Ok(true)
     }
 
-    fn get_authorized_get_client(&self, url: Url) -> RequestBuilder {
+    fn authorized_get_client(&self, url: Url) -> RequestBuilder {
         let client = EpicAPI::build_client().build().unwrap();
         self.set_authorization_header(client.clone().get(url))
     }
 
-    fn get_authorized_post_client(&self, url: Url) -> RequestBuilder {
+    fn authorized_post_client(&self, url: Url) -> RequestBuilder {
         let client = EpicAPI::build_client().build().unwrap();
         self.set_authorization_header(client.clone().post(url))
     }
@@ -305,7 +305,7 @@ impl EpicAPI {
     }
 
     pub async fn resume_session(&mut self) -> Result<bool, EpicAPIError> {
-        match self.get_authorized_get_client(Url::parse("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify").unwrap()).send().await {
+        match self.authorized_get_client(Url::parse("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify").unwrap()).send().await {
             Ok(response) => {
                 return self.handle_login_response(response).await;
             }
@@ -336,7 +336,7 @@ impl EpicAPI {
         return false;
     }
 
-    pub async fn get_assets(
+    pub async fn assets(
         &mut self,
         platform: Option<String>,
         label: Option<String>,
@@ -345,7 +345,7 @@ impl EpicAPI {
         let lab = label.unwrap_or("Live".to_string());
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/{}?label={}", plat, lab);
         match self
-            .get_authorized_get_client(Url::parse(&url).unwrap())
+            .authorized_get_client(Url::parse(&url).unwrap())
             .send()
             .await
         {
@@ -374,7 +374,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_asset_manifest(
+    pub async fn asset_manifest(
         &self,
         platform: Option<String>,
         label: Option<String>,
@@ -392,16 +392,23 @@ impl EpicAPI {
             return Err(EpicAPIError::InvalidParams);
         };
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.unwrap_or("Windows".to_string()), namespace.unwrap(), item_id.unwrap(), app.unwrap(), label.unwrap_or("Live".to_string()));
+                          platform.clone().unwrap_or("Windows".to_string()), namespace.clone().unwrap(), item_id.clone().unwrap(), app.clone().unwrap(), label.clone().unwrap_or("Live".to_string()));
         match self
-            .get_authorized_get_client(Url::parse(&url).unwrap())
+            .authorized_get_client(Url::parse(&url).unwrap())
             .send()
             .await
         {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(manifest) => Ok(manifest),
+                    match response.json::<AssetManifest>().await {
+                        Ok(mut manifest) => {
+                            manifest.platform = platform;
+                            manifest.label = label;
+                            manifest.namespace = namespace;
+                            manifest.item_id = item_id;
+                            manifest.app = app;
+                            Ok(manifest)
+                        }
                         Err(e) => {
                             error!("{:?}", e);
                             Err(EpicAPIError::Unknown)
@@ -423,71 +430,112 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_asset_download_manifest(
+    pub async fn asset_download_manifest(
         &self,
-        manifest: Manifest,
+        asset_manifest: AssetManifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
-        let mut queries: Vec<String> = Vec::new();
-        debug!("{:?}", manifest);
-        for query in manifest.query_params {
-            queries.push(format!("{}={}", query.name, query.value));
-        }
-        let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
-        let client = EpicAPI::build_client().build().unwrap();
-        match client.get(Url::from_str(&url).unwrap()).send().await {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.bytes().await {
-                        Ok(data) => match DownloadManifest::parse(data.to_vec()) {
-                            None => {
-                                error!("Unable to parse the Download Manifest");
-                                Err(EpicAPIError::Unknown)
-                            }
-                            Some(mut man) => {
-                                let mut url = manifest.uri.clone();
-                                url.set_path(&match url.path_segments() {
-                                    None => "".to_string(),
-                                    Some(segments) => {
-                                        let mut vec: Vec<&str> = segments.collect();
-                                        vec.remove(vec.len() - 1);
-                                        vec.join("/")
+        let base_urls = asset_manifest.url_csv();
+        for elem in asset_manifest.elements {
+            for manifest in elem.manifests {
+                let mut queries: Vec<String> = Vec::new();
+                debug!("{:?}", manifest);
+                for query in manifest.query_params {
+                    queries.push(format!("{}={}", query.name, query.value));
+                }
+                let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
+                let client = EpicAPI::build_client().build().unwrap();
+                match client.get(Url::from_str(&url).unwrap()).send().await {
+                    Ok(response) => {
+                        if response.status() == reqwest::StatusCode::OK {
+                            match response.bytes().await {
+                                Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                                    None => {
+                                        error!("Unable to parse the Download Manifest");
+                                        return Err(EpicAPIError::Unknown);
                                     }
-                                });
-                                url.set_query(None);
-                                url.set_fragment(None);
-                                man.base_url = Some(url);
-                                Ok(man)
+                                    Some(mut man) => {
+                                        let mut url = manifest.uri.clone();
+                                        url.set_path(&match url.path_segments() {
+                                            None => "".to_string(),
+                                            Some(segments) => {
+                                                let mut vec: Vec<&str> = segments.collect();
+                                                vec.remove(vec.len() - 1);
+                                                vec.join("/")
+                                            }
+                                        });
+                                        url.set_query(None);
+                                        url.set_fragment(None);
+                                        man.set_custom_field(
+                                            "BaseUrl".to_string(),
+                                            base_urls.clone(),
+                                        );
+
+                                        if let Some(id) = asset_manifest.item_id {
+                                            man.set_custom_field(
+                                                "CatalogItemId".to_string(),
+                                                id.clone(),
+                                            );
+                                        }
+                                        if let Some(label) = asset_manifest.label {
+                                            man.set_custom_field(
+                                                "BuildLabel".to_string(),
+                                                label.clone(),
+                                            );
+                                        }
+                                        if let Some(ns) = asset_manifest.namespace {
+                                            man.set_custom_field(
+                                                "CatalogNamespace".to_string(),
+                                                ns.clone(),
+                                            );
+                                        }
+
+                                        if let Some(app) = asset_manifest.app {
+                                            man.set_custom_field(
+                                                "CatalogAssetName".to_string(),
+                                                app.clone(),
+                                            );
+                                        }
+
+                                        println!("{:#?}", man.custom_fields);
+                                        man.set_custom_field(
+                                            "SourceURL".to_string(),
+                                            url.to_string(),
+                                        );
+                                        return Ok(man);
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("{:?}", e);
+                                    return Err(EpicAPIError::Unknown);
+                                }
                             }
-                        },
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
+                        } else {
+                            warn!(
+                                "{} result: {}",
+                                response.status(),
+                                response.text().await.unwrap()
+                            );
+                            return Err(EpicAPIError::Unknown);
                         }
                     }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
+                    Err(e) => {
+                        error!("{:?}", e);
+                        return Err(EpicAPIError::Unknown);
+                    }
                 }
             }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
         }
+        Err(EpicAPIError::Unknown)
     }
 
-    pub async fn get_asset_info(
+    pub async fn asset_info(
         &self,
         asset: EpicAsset,
     ) -> Result<HashMap<String, AssetInfo>, EpicAPIError> {
         let url = format!("https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/{}/bulk/items?id={}&includeDLCDetails=true&includeMainGameDetails=true&country=us&locale=lc",
                           asset.namespace, asset.catalog_item_id);
         match self
-            .get_authorized_get_client(Url::parse(&url).unwrap())
+            .authorized_get_client(Url::parse(&url).unwrap())
             .send()
             .await
         {
@@ -516,12 +564,12 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_game_token(&self) -> Result<GameToken, EpicAPIError> {
+    pub async fn game_token(&self) -> Result<GameToken, EpicAPIError> {
         let url = format!(
             "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange"
         );
         match self
-            .get_authorized_get_client(Url::parse(&url).unwrap())
+            .authorized_get_client(Url::parse(&url).unwrap())
             .send()
             .await
         {
@@ -550,10 +598,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_ownership_token(
-        &self,
-        asset: EpicAsset,
-    ) -> Result<OwnershipToken, EpicAPIError> {
+    pub async fn ownership_token(&self, asset: EpicAsset) -> Result<OwnershipToken, EpicAPIError> {
         let url = match &self.user_data.account_id {
             None => {
                 return Err(EpicAPIError::InvalidCredentials);
@@ -564,7 +609,7 @@ impl EpicAPI {
             }
         };
         match self
-            .get_authorized_post_client(Url::parse(&url).unwrap())
+            .authorized_post_client(Url::parse(&url).unwrap())
             .form(&[(
                 "nsCatalogItemId".to_string(),
                 format!("{}:{}", asset.namespace, asset.catalog_item_id),
@@ -597,7 +642,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_user_entitlements(&self) -> Result<Vec<Entitlement>, EpicAPIError> {
+    pub async fn user_entitlements(&self) -> Result<Vec<Entitlement>, EpicAPIError> {
         let url = match &self.user_data.account_id {
             None => {
                 return Err(EpicAPIError::InvalidCredentials);
@@ -608,7 +653,7 @@ impl EpicAPI {
             }
         };
         match self
-            .get_authorized_get_client(Url::parse(&url).unwrap())
+            .authorized_get_client(Url::parse(&url).unwrap())
             .send()
             .await
         {
@@ -637,10 +682,7 @@ impl EpicAPI {
         }
     }
 
-    pub async fn get_library_items(
-        &mut self,
-        include_metadata: bool,
-    ) -> Result<Library, EpicAPIError> {
+    pub async fn library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
         let mut library = Library {
             records: vec![],
             response_metadata: Default::default(),
@@ -657,7 +699,7 @@ impl EpicAPI {
             };
 
             match self
-                .get_authorized_get_client(Url::parse(&url).unwrap())
+                .authorized_get_client(Url::parse(&url).unwrap())
                 .send()
                 .await
             {

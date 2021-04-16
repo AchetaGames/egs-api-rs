@@ -44,8 +44,8 @@ pub struct AssetInfo {
 
 impl AssetInfo {
     /// Get the latest release by release_date
-    pub fn get_latest_release(&self) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.get_sorted_releases() {
+    pub fn latest_release(&self) -> Option<ReleaseInfo> {
+        if let Some(releases) = self.sorted_releases() {
             if let Some(rel) = releases.first() {
                 return Some(rel.clone());
             }
@@ -54,7 +54,7 @@ impl AssetInfo {
     }
 
     /// Get list of sorted releases newest to oldest
-    pub fn get_sorted_releases(&self) -> Option<Vec<ReleaseInfo>> {
+    pub fn sorted_releases(&self) -> Option<Vec<ReleaseInfo>> {
         if let Some(mut release_info) = self.release_info.clone() {
             release_info.sort_by_key(|ri| ri.date_added);
             release_info.reverse();
@@ -65,7 +65,7 @@ impl AssetInfo {
     }
 
     /// Get release info based on the release id
-    pub fn get_release_id(&self, id: &String) -> Option<ReleaseInfo> {
+    pub fn release_info(&self, id: &String) -> Option<ReleaseInfo> {
         if let Some(releases) = self.release_info.clone() {
             for release in releases {
                 if release.id.clone().unwrap_or_default().eq(id) {
@@ -77,7 +77,7 @@ impl AssetInfo {
     }
 
     /// Get release info based on the release name
-    pub fn get_release_name(&self, name: &String) -> Option<ReleaseInfo> {
+    pub fn release_name(&self, name: &String) -> Option<ReleaseInfo> {
         if let Some(releases) = self.release_info.clone() {
             for release in releases {
                 if release.app_id.clone().unwrap_or_default().eq(name) {
@@ -89,7 +89,7 @@ impl AssetInfo {
     }
 
     /// Get list of all compatible apps across all releases
-    pub fn get_compatible_apps(&self) -> Option<Vec<String>> {
+    pub fn compatible_apps(&self) -> Option<Vec<String>> {
         match &self.release_info {
             None => {}
             Some(release_infos) => {
@@ -109,7 +109,7 @@ impl AssetInfo {
     }
 
     /// Get list of all platforms across all releases
-    pub fn get_platforms(&self) -> Option<Vec<String>> {
+    pub fn platforms(&self) -> Option<Vec<String>> {
         match &self.release_info {
             None => {}
             Some(release_infos) => {

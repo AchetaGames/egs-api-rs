@@ -23,7 +23,7 @@ use reqwest::header;
 use log::{error,info,warn};
 
 use api::types::asset_info::{AssetInfo, GameToken};
-use api::types::asset_manifest::{AssetManifest, Manifest};
+use api::types::asset_manifest::{AssetManifest};
 use api::types::download_manifest::DownloadManifest;
 use api::types::library::Library;
 use api::types::entitlement::Entitlement;
@@ -206,14 +206,14 @@ impl EpicGames {
 
     /// Returns all assets
     pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
-        match self.egs.get_assets(None, None).await {
+        match self.egs.assets(None, None).await {
             Ok(b) => b,
             Err(_) => Vec::new(),
         }
     }
 
     /// Return asset
-    pub async fn get_asset_manifest(
+    pub async fn asset_manifest(
         &mut self,
         platform: Option<String>,
         label: Option<String>,
@@ -223,7 +223,7 @@ impl EpicGames {
     ) -> Option<AssetManifest> {
         match self
             .egs
-            .get_asset_manifest(platform, label, namespace, item_id, app)
+            .asset_manifest(platform, label, namespace, item_id, app)
             .await
         {
             Ok(a) => Some(a),
@@ -232,51 +232,51 @@ impl EpicGames {
     }
 
     /// Returns info for an asset
-    pub async fn get_asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
-        match self.egs.get_asset_info(asset.clone()).await {
+    pub async fn asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
+        match self.egs.asset_info(asset.clone()).await {
             Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
             Err(_) => None,
         }
     }
 
     /// Returns game token
-    pub async fn get_game_token(&mut self) -> Option<GameToken> {
-        match self.egs.get_game_token().await {
+    pub async fn game_token(&mut self) -> Option<GameToken> {
+        match self.egs.game_token().await {
             Ok(a) => Some(a),
             Err(_) => None,
         }
     }
 
     /// Returns ownership token for an Asset
-    pub async fn get_ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
-        match self.egs.get_ownership_token(asset).await {
+    pub async fn ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
+        match self.egs.ownership_token(asset).await {
             Ok(a) => Some(a.token),
             Err(_) => None,
         }
     }
 
     ///Returns user entitlements
-    pub async fn get_user_entitlements(&mut self) -> Vec<Entitlement> {
-        match self.egs.get_user_entitlements().await {
+    pub async fn user_entitlements(&mut self) -> Vec<Entitlement> {
+        match self.egs.user_entitlements().await {
             Ok(a) => a,
             Err(_) => Vec::new(),
         }
     }
 
     /// Returns the user library
-    pub async fn get_library_items(&mut self, include_metadata: bool) -> Option<Library> {
-        match self.egs.get_library_items(include_metadata).await {
+    pub async fn library_items(&mut self, include_metadata: bool) -> Option<Library> {
+        match self.egs.library_items(include_metadata).await {
             Ok(a) => Some(a),
             Err(_) => None,
         }
     }
 
     /// Returns a DownloadManifest for a specified file manifest
-    pub async fn get_asset_download_manifest(
+    pub async fn asset_download_manifest(
         &self,
-        manifest: Manifest,
+        manifest: AssetManifest,
     ) -> Result<DownloadManifest, EpicAPIError> {
-        match self.egs.get_asset_download_manifest(manifest).await {
+        match self.egs.asset_download_manifest(manifest).await {
             Ok(manifest) => Ok(manifest),
             Err(e) => Err(e),
         }

@@ -16,7 +16,6 @@ use std::str::FromStr;
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DownloadManifest {
-    pub base_url: Option<Url>,
     #[serde(deserialize_with = "deserialize_epic_string")]
     pub manifest_file_version: u128,
     #[serde(rename = "bIsFileData")]
@@ -132,7 +131,7 @@ where
 
 impl DownloadManifest {
     /// Get chunk dir based on the manifest version
-    fn get_chunk_dir(version: u128) -> &'static str {
+    fn chunk_dir(version: u128) -> &'static str {
         if version >= 15 {
             "ChunksV4"
         } else if version >= 6 {
@@ -144,16 +143,45 @@ impl DownloadManifest {
         }
     }
 
+    pub(crate) fn set_custom_field(&mut self, key: String, value: String) {
+        if let Some(fields) = self.custom_fields.as_mut() {
+            fields.insert(key, value);
+        } else {
+            self.custom_fields = Some([(key, value)].iter().cloned().collect())
+        };
+    }
+
+    pub(crate) fn custom_field(&self, key: &str) -> Option<String> {
+        match &self.custom_fields {
+            Some(fields) => match fields.get(key) {
+                None => None,
+                Some(v) => Some(v.clone()),
+            },
+            None => None,
+        }
+    }
+
     /// Get the download links from the downloaded manifest
-    fn get_download_links(&self) -> HashMap<String, Url> {
-        let url = match self.base_url.clone() {
-            None => {
-                return HashMap::new();
-            }
+    fn download_links(&self) -> Option<HashMap<String, Url>> {
+        let url = match self.custom_field("SourceURL") {
+            None => match self.custom_field("BaseUrl") {
+                None => {
+                    return None;
+                }
+                Some(urls) => {
+                    let split = urls.split(',').collect::<Vec<&str>>();
+                    match split.first() {
+                        None => {
+                            return None;
+                        }
+                        Some(uri) => uri.to_string(),
+                    }
+                }
+            },
             Some(uri) => uri,
         };
 
-        let chunk_dir = DownloadManifest::get_chunk_dir(self.manifest_file_version);
+        let chunk_dir = DownloadManifest::chunk_dir(self.manifest_file_version);
         let mut result: HashMap<String, Url> = HashMap::new();
 
         for (guid, hash) in self.chunk_hash_list.clone() {
@@ -167,24 +195,20 @@ impl DownloadManifest {
                 guid.clone(),
                 Url::parse(&format!(
                     "{}/{}/{:02}/{:016X}_{}.chunk",
-                    url.as_str(),
-                    chunk_dir,
-                    group_num,
-                    hash,
-                    guid
+                    url, chunk_dir, group_num, hash, guid
                 ))
                 .unwrap(),
             );
         }
-        result
+        Some(result)
     }
 
     /// Get list of files in the manifest
-    pub fn get_files(&self) -> HashMap<String, FileManifestList> {
+    pub fn files(&self) -> HashMap<String, FileManifestList> {
         let mut result: HashMap<String, FileManifestList> = HashMap::new();
-        let links = match self.base_url.clone() {
+        let links = match self.download_links() {
             None => HashMap::new(),
-            Some(_) => self.get_download_links(),
+            Some(l) => l,
         };
 
         for file in self.file_manifest_list.clone() {
@@ -216,11 +240,20 @@ impl DownloadManifest {
         return result;
     }
 
-    /// Get total size of files in the manifest
-    pub fn get_total_size(&self) -> u128 {
+    /// Get total size of chunks in the manifest
+    pub fn total_download_size(&self) -> u128 {
         let mut total: u128 = 0;
         for (_, size) in &self.chunk_filesize_list {
             total += size.clone();
+        }
+        total
+    }
+
+    /// Get total size of chunks in the manifest
+    pub fn total_size(&self) -> u128 {
+        let mut total: u128 = 0;
+        for f in &self.file_manifest_list {
+            total += f.size();
         }
         total
     }
@@ -246,7 +279,6 @@ impl DownloadManifest {
     /// Creates the structure from binary data
     pub fn from_vec(mut buffer: Vec<u8>) -> Option<DownloadManifest> {
         let mut res = DownloadManifest {
-            base_url: None,
             manifest_file_version: 0,
             b_is_file_data: false,
             app_id: 0,
@@ -933,7 +965,16 @@ pub struct FileManifestList {
     pub file_chunk_parts: Vec<FileChunkPart>,
 }
 
-// TODO: Write deserialization so offset and size are converted to u128
+impl FileManifestList {
+    /// Get File Size
+    pub fn size(&self) -> u128 {
+        self.file_chunk_parts
+            .iter()
+            .map(|part| part.size)
+            .sum::<u128>()
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
