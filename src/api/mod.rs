@@ -496,7 +496,6 @@ impl EpicAPI {
                                             );
                                         }
 
-                                        println!("{:#?}", man.custom_fields);
                                         man.set_custom_field(
                                             "SourceURL".to_string(),
                                             url.to_string(),
