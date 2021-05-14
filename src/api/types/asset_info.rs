@@ -90,40 +90,34 @@ impl AssetInfo {
 
     /// Get list of all compatible apps across all releases
     pub fn compatible_apps(&self) -> Option<Vec<String>> {
-        match &self.release_info {
-            None => {}
-            Some(release_infos) => {
-                let mut res: Vec<String> = Vec::new();
-                for info in release_infos {
-                    match &info.compatible_apps {
-                        None => {}
-                        Some(ca) => res.append(&mut ca.clone()),
-                    };
-                }
-                res.sort();
-                res.dedup();
-                return Some(res);
+        if let Some(release_infos) = &self.release_info {
+            let mut res: Vec<String> = Vec::new();
+            for info in release_infos {
+                match &info.compatible_apps {
+                    None => {}
+                    Some(ca) => res.append(&mut ca.clone()),
+                };
             }
+            res.sort();
+            res.dedup();
+            return Some(res);
         }
         None
     }
 
     /// Get list of all platforms across all releases
     pub fn platforms(&self) -> Option<Vec<String>> {
-        match &self.release_info {
-            None => {}
-            Some(release_infos) => {
-                let mut res: Vec<String> = Vec::new();
-                for info in release_infos {
-                    match &info.platform {
-                        None => {}
-                        Some(p) => res.append(&mut p.clone()),
-                    };
-                }
-                res.sort();
-                res.dedup();
-                return Some(res);
+        if let Some(release_infos) = &self.release_info {
+            let mut res: Vec<String> = Vec::new();
+            for info in release_infos {
+                match &info.platform {
+                    None => {}
+                    Some(p) => res.append(&mut p.clone()),
+                };
             }
+            res.sort();
+            res.dedup();
+            return Some(res);
         }
         None
     }

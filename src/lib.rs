@@ -50,14 +50,11 @@ impl EpicGames {
 
     /// Check whether the user is logged in
     pub fn is_logged_in(&self) -> bool {
-        match self.egs.user_data.expires_at {
-            None => {}
-            Some(exp) => {
-                let now = chrono::offset::Utc::now();
-                let td = exp - now;
-                if td.num_seconds() > 600 {
-                    return true;
-                }
+        if let Some(exp) = self.egs.user_data.expires_at {
+            let now = chrono::offset::Utc::now();
+            let td = exp - now;
+            if td.num_seconds() > 600 {
+                return true;
             }
         }
         return false;
@@ -100,19 +97,12 @@ impl EpicGames {
 
         let mut xsrf_token: String = "".to_string();
 
-        match client
-            .get("https://www.epicgames.com/id/api/csrf")
-            .send()
-            .await
-        {
-            Ok(resp) => {
-                for cookie in resp.cookies() {
-                    if cookie.name().to_lowercase() == "xsrf-token" {
-                        xsrf_token = cookie.value().to_string();
-                    }
+        if let Ok(resp) = client.get("https://www.epicgames.com/id/api/csrf").send().await {
+            for cookie in resp.cookies() {
+                if cookie.name().to_lowercase() == "xsrf-token" {
+                    xsrf_token = cookie.value().to_string();
                 }
             }
-            _ => {}
         }
 
         match client
@@ -142,10 +132,10 @@ impl EpicGames {
     pub async fn auth_code(&mut self, code: String) -> bool {
         match self.egs.start_session(Some(code)).await {
             Ok(b) => {
-                return b;
+                b
             }
             Err(_) => {
-                return false;
+                false
             }
         }
     }
@@ -157,46 +147,40 @@ impl EpicGames {
 
     /// Perform login based on previous authentication
     pub async fn login(&mut self) -> bool {
-        match self.egs.user_data.expires_at {
-            None => {}
-            Some(exp) => {
-                let now = chrono::offset::Utc::now();
-                let td = exp - now;
-                if td.num_seconds() > 600 {
-                    info!("Trying to re-use existing login session... ");
-                    match self.egs.resume_session().await {
-                        Ok(b) => {
-                            if b {
-                                info!("Logged in");
-                                return true;
-                            }
-                            return false;
+        if let Some(exp) = self.egs.user_data.expires_at {
+            let now = chrono::offset::Utc::now();
+            let td = exp - now;
+            if td.num_seconds() > 600 {
+                info!("Trying to re-use existing login session... ");
+                match self.egs.resume_session().await {
+                    Ok(b) => {
+                        if b {
+                            info!("Logged in");
+                            return true;
                         }
-                        Err(e) => {
-                            warn!("{}", e)
-                        }
-                    };
-                }
+                        return false;
+                    }
+                    Err(e) => {
+                        warn!("{}", e)
+                    }
+                };
             }
         }
         info!("Logging in...");
-        match self.egs.user_data.refresh_expires_at {
-            None => {}
-            Some(exp) => {
-                let now = chrono::offset::Utc::now();
-                let td = exp - now;
-                if td.num_seconds() > 600 {
-                    match self.egs.start_session(None).await {
-                        Ok(b) => {
-                            if b {
-                                info!("Logged in");
-                                return true;
-                            }
-                            return false;
+        if let Some(exp) = self.egs.user_data.refresh_expires_at {
+            let now = chrono::offset::Utc::now();
+            let td = exp - now;
+            if td.num_seconds() > 600 {
+                match self.egs.start_session(None).await {
+                    Ok(b) => {
+                        if b {
+                            info!("Logged in");
+                            return true;
                         }
-                        Err(e) => {
-                            error!("{}", e)
-                        }
+                        return false;
+                    }
+                    Err(e) => {
+                        error!("{}", e)
                     }
                 }
             }

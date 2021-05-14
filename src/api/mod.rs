@@ -287,12 +287,9 @@ impl EpicAPI {
 
         self.user_data.update(new);
 
-        match &self.user_data.error_message {
-            None => {}
-            Some(m) => {
-                error!("{}", m);
-                return Err(EpicAPIError::APIError(m.to_string()));
-            }
+        if let Some(m) = &self.user_data.error_message {
+            error!("{}", m);
+            return Err(EpicAPIError::APIError(m.to_string()));
         }
         Ok(true)
     }
@@ -337,19 +334,16 @@ impl EpicAPI {
     }
 
     pub async fn invalidate_sesion(&mut self) -> bool {
-        match &self.user_data.access_token {
-            None => {}
-            Some(access_token) => {
-                let url = format!("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}", access_token);
-                let client = EpicAPI::build_client().build().unwrap();
-                match client.delete(Url::from_str(&url).unwrap()).send().await {
-                    Ok(_) => {
-                        info!("Session invalidated");
-                        return true;
-                    }
-                    Err(e) => {
-                        warn!("Unable to invalidate session: {}", e)
-                    }
+        if let Some(access_token) = &self.user_data.access_token {
+            let url = format!("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}", access_token);
+            let client = EpicAPI::build_client().build().unwrap();
+            match client.delete(Url::from_str(&url).unwrap()).send().await {
+                Ok(_) => {
+                    info!("Session invalidated");
+                    return true;
+                }
+                Err(e) => {
+                    warn!("Unable to invalidate session: {}", e)
                 }
             }
         };
@@ -464,14 +458,14 @@ impl EpicAPI {
                 }
                 let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
                 let client = EpicAPI::build_client().build().unwrap();
-                match client.get(Url::from_str(&url).unwrap()).send().await {
+                return match client.get(Url::from_str(&url).unwrap()).send().await {
                     Ok(response) => {
                         if response.status() == reqwest::StatusCode::OK {
                             match response.bytes().await {
                                 Ok(data) => match DownloadManifest::parse(data.to_vec()) {
                                     None => {
                                         error!("Unable to parse the Download Manifest");
-                                        return Err(EpicAPIError::Unknown);
+                                        Err(EpicAPIError::Unknown)
                                     }
                                     Some(mut man) => {
                                         let mut url = manifest.uri.clone();
@@ -520,12 +514,12 @@ impl EpicAPI {
                                             "SourceURL".to_string(),
                                             url.to_string(),
                                         );
-                                        return Ok(man);
+                                        Ok(man)
                                     }
                                 },
                                 Err(e) => {
                                     error!("{:?}", e);
-                                    return Err(EpicAPIError::Unknown);
+                                    Err(EpicAPIError::Unknown)
                                 }
                             }
                         } else {
@@ -534,12 +528,12 @@ impl EpicAPI {
                                 response.status(),
                                 response.text().await.unwrap()
                             );
-                            return Err(EpicAPIError::Unknown);
+                            Err(EpicAPIError::Unknown)
                         }
                     }
                     Err(e) => {
                         error!("{:?}", e);
-                        return Err(EpicAPIError::Unknown);
+                        Err(EpicAPIError::Unknown)
                     }
                 }
             }
