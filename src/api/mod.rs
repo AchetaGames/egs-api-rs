@@ -82,10 +82,19 @@ impl UserData {
         self.access_token.clone()
     }
 
-
     /// Get refresh token
     pub fn refresh_token(&self) -> Option<String> {
         self.refresh_token.clone()
+    }
+
+    /// Set access token
+    pub fn set_access_token(&mut self, token: Option<String>) {
+        self.access_token = token;
+    }
+
+    /// Set refresh token
+    pub fn set_refresh_token(&mut self, token: Option<String>) {
+        self.refresh_token = token;
     }
 
     /// Updates only the present values in the existing user data
