@@ -77,6 +77,17 @@ impl UserData {
         }
     }
 
+    /// Get access token
+    pub fn access_token(&self) -> Option<String> {
+        self.access_token.clone()
+    }
+
+
+    /// Get refresh token
+    pub fn refresh_token(&self) -> Option<String> {
+        self.refresh_token.clone()
+    }
+
     /// Updates only the present values in the existing user data
     pub fn update(&mut self, new: UserData) {
         if let Some(n) = new.access_token {
