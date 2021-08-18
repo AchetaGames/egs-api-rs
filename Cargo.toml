@@ -14,16 +14,16 @@ edition = "2018"
 [dependencies]
 reqwest = { version = "0.11", features = ["json", "cookies", "blocking"] }
 serde_json = "1.0"
-url = { version = "2.2.1", features = ["serde"] }
+url = { version = "2.2", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
-sha-1 = "0.9.4"
+sha-1 = "0.9"
 flate2 = "1.0.20"
 num = "0.4.0"
 
 [dependencies.tokio]
-version = "1.2.0"
-features = ["full"]
+version = "1.10"
+features = ["macros"]
 
 [dependencies.serde]
 version = "1.0.123"
