@@ -1,6 +1,6 @@
 [package]
 name = "egs-api"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description = "Interface to the Epic Games API"
 categories = ["asynchronous"]
@@ -20,6 +20,8 @@ log = "0.4"
 sha-1 = "0.9"
 flate2 = "1.0.20"
 num = "0.4.0"
+reqwest_cookie_store = "0.2.0"
+cookie_store = "0.15.0"
 
 [dependencies.tokio]
 version = "1.10"

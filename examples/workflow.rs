@@ -17,6 +17,7 @@ async fn main() {
     sid = sid.trim().to_string();
     sid = sid.replace(|c: char| c == '"', "");
     let mut egs = EpicGames::new();
+    println!("Using sid: {}", sid);
 
     match egs.auth_sid(sid.as_str()).await {
         None => {

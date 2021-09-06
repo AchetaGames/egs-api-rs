@@ -19,14 +19,14 @@
 //!  - Generate download links for chunks
 
 use chrono;
+use log::{error, info, warn};
 use reqwest::header;
-use log::{error,info,warn};
 
 use api::types::asset_info::{AssetInfo, GameToken};
-use api::types::asset_manifest::{AssetManifest};
+use api::types::asset_manifest::AssetManifest;
 use api::types::download_manifest::DownloadManifest;
-use api::types::library::Library;
 use api::types::entitlement::Entitlement;
+use api::types::library::Library;
 
 use crate::api::types::epic_asset::EpicAsset;
 use crate::api::{EpicAPI, EpicAPIError, UserData};
@@ -80,16 +80,25 @@ impl EpicGames {
         headers.insert("X-Requested-With", "XMLHttpRequest".parse().unwrap());
         headers.insert(
             "User-Agent",
-            "EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live "
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live UnrealEngine/4.23.0-14907503+++Portal+Release-Live Chrome/84.0.4147.38 Safari/537.36"
                 .parse()
                 .unwrap(),
         );
         let url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
+        let mut store = cookie_store::CookieStore::load_json("".as_bytes()).unwrap();
+        store.parse(
+            "EPIC_COUNTRY=US",
+            &reqwest::Url::parse("https://www.epicgames.com").unwrap(),
+        ).unwrap();
+        let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(store);
+        let cookie_store = std::sync::Arc::new(cookie_store);
         let client = reqwest::Client::builder()
             .cookie_store(true)
+            .cookie_provider(cookie_store)
             .default_headers(headers)
             .build()
             .unwrap();
+
         match client.get(&url).send().await {
             Ok(_resp) => {}
             _ => {}
@@ -97,10 +106,15 @@ impl EpicGames {
 
         let mut xsrf_token: String = "".to_string();
 
-        if let Ok(resp) = client.get("https://www.epicgames.com/id/api/csrf").send().await {
+        if let Ok(resp) = client
+            .get("https://www.epicgames.com/id/api/csrf")
+            .send()
+            .await
+        {
             for cookie in resp.cookies() {
                 if cookie.name().to_lowercase() == "xsrf-token" {
                     xsrf_token = cookie.value().to_string();
+                    break;
                 }
             }
         }
@@ -119,7 +133,8 @@ impl EpicGames {
                         None => None,
                     }
                 } else {
-                    //let echo_json: serde_json::Value = resp.json().await.unwrap();
+                    let echo_json: serde_json::Value = resp.json().await.unwrap();
+                    error!("{:?}", echo_json);
                     //TODO: return the error from echo_json
                     None
                 }
@@ -131,12 +146,8 @@ impl EpicGames {
     /// Start session with auth code
     pub async fn auth_code(&mut self, code: String) -> bool {
         match self.egs.start_session(Some(code)).await {
-            Ok(b) => {
-                b
-            }
-            Err(_) => {
-                false
-            }
+            Ok(b) => b,
+            Err(_) => false,
         }
     }
 
