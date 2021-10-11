@@ -42,8 +42,8 @@ pub struct DownloadManifest {
 }
 
 fn deserialize_epic_string<'de, D>(deserializer: D) -> Result<u128, D::Error>
-where
-    D: de::Deserializer<'de>,
+    where
+        D: de::Deserializer<'de>,
 {
     struct JsonStringVisitor;
 
@@ -55,8 +55,8 @@ where
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+            where
+                E: de::Error,
         {
             match FromStr::from_str(v) {
                 Ok(str) => Ok(crate::api::utils::blob_to_num::<String>(str)),
@@ -69,8 +69,8 @@ where
 }
 
 fn deserialize_epic_hash<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: de::Deserializer<'de>,
+    where
+        D: de::Deserializer<'de>,
 {
     struct JsonStringVisitor;
 
@@ -82,8 +82,8 @@ where
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+            where
+                E: de::Error,
         {
             match FromStr::from_str(v) {
                 Ok(str) => {
@@ -103,8 +103,8 @@ where
 }
 
 fn deserialize_epic_hashmap<'de, D>(deserializer: D) -> Result<HashMap<String, u128>, D::Error>
-where
-    D: de::Deserializer<'de>,
+    where
+        D: de::Deserializer<'de>,
 {
     let str_map = HashMap::<String, String>::deserialize(deserializer)?;
     let original_len = str_map.len();
@@ -153,10 +153,7 @@ impl DownloadManifest {
 
     pub(crate) fn custom_field(&self, key: &str) -> Option<String> {
         match &self.custom_fields {
-            Some(fields) => match fields.get(key) {
-                None => None,
-                Some(v) => Some(v.clone()),
-            },
+            Some(fields) => fields.get(key).cloned(),
             None => None,
         }
     }
@@ -197,7 +194,7 @@ impl DownloadManifest {
                     "{}/{}/{:02}/{:016X}_{}.chunk",
                     url, chunk_dir, group_num, hash, guid
                 ))
-                .unwrap(),
+                    .unwrap(),
             );
         }
         Some(result)
@@ -237,14 +234,14 @@ impl DownloadManifest {
                 },
             );
         }
-        return result;
+        result
     }
 
     /// Get total size of chunks in the manifest
     pub fn total_download_size(&self) -> u128 {
         let mut total: u128 = 0;
-        for (_, size) in &self.chunk_filesize_list {
-            total += size.clone();
+        for size in self.chunk_filesize_list.values() {
+            total += size;
         }
         total
     }
@@ -311,10 +308,7 @@ impl DownloadManifest {
         let _size_compressed = crate::api::utils::read_le(&buffer, &mut position);
         position += 20;
         let sha_hash: [u8; 20] = buffer[position - 20..position].try_into().unwrap();
-        let compressed = match buffer[position] {
-            0 => false,
-            _ => true,
-        };
+        let compressed = !matches!(buffer[position], 0);
         position += 1;
         let _version = crate::api::utils::read_le(&buffer, &mut position);
 
@@ -348,10 +342,7 @@ impl DownloadManifest {
 
         res.manifest_file_version = crate::api::utils::read_le(&buffer, &mut position).into();
 
-        res.b_is_file_data = match buffer[position] {
-            0 => false,
-            _ => true,
-        };
+        res.b_is_file_data = !matches!(buffer[position], 0);
         position += 1;
         res.app_id = crate::api::utils::read_le(&buffer, &mut position) as u128;
         res.app_name_string =
@@ -388,7 +379,7 @@ impl DownloadManifest {
         } else {
             None
         }
-        .unwrap_or_default();
+            .unwrap_or_default();
 
         debug!(
             "Manifest metadata read length(needs to match {}): {}",
@@ -706,10 +697,8 @@ impl DownloadManifest {
 
         // Chunks
 
-        let mut chunks: Vec<u8> = Vec::new();
-
         // version
-        chunks.push(0);
+        let mut chunks: Vec<u8> = vec![0];
 
         // count
         chunks.append(
@@ -719,7 +708,7 @@ impl DownloadManifest {
                 .borrow_mut(),
         );
 
-        for (chunk, _) in &self.chunk_hash_list {
+        for chunk in self.chunk_hash_list.keys() {
             let subs = chunk
                 .as_bytes()
                 .chunks(8)
@@ -739,21 +728,21 @@ impl DownloadManifest {
 
         // TODO: PROBABLY SORT THE CHUNKS SO WE GUARANTEE THE ORDER
 
-        for (_, hash) in &self.chunk_hash_list {
+        for hash in self.chunk_hash_list.values() {
             match u64::try_from(*hash) {
                 Ok(h) => chunks.append(h.to_le_bytes().to_vec().borrow_mut()),
-                Err(_) => chunks.append((0 as u64).to_le_bytes().to_vec().borrow_mut()),
+                Err(_) => chunks.append((0_u64).to_le_bytes().to_vec().borrow_mut()),
             }
         }
 
-        for (_, sha) in self.chunk_sha_list.as_ref().unwrap() {
+        for sha in self.chunk_sha_list.as_ref().unwrap().values() {
             match crate::api::utils::decode_hex(sha.as_str()) {
                 Ok(mut s) => chunks.append(s.borrow_mut()),
                 Err(_) => chunks.append(vec![0u8; 20].borrow_mut()),
             }
         }
 
-        for (_, group) in &self.data_group_list {
+        for group in self.data_group_list.values() {
             chunks.append(
                 u8::try_from(*group)
                     .unwrap_or_default()
@@ -764,7 +753,7 @@ impl DownloadManifest {
         }
 
         // TODO: THIS IS WRONG THIS SHOULD BE UNCOMPRESSED SIZE, CAN BE PROBABLY GOT FROM THE FILE MANIFEST
-        for (_, window) in &self.chunk_filesize_list {
+        for window in self.chunk_filesize_list.values() {
             chunks.append(
                 u32::try_from(*window)
                     .unwrap_or_default()
@@ -774,7 +763,7 @@ impl DownloadManifest {
             )
         }
         // File Size
-        for (_, file) in &self.chunk_filesize_list {
+        for file in self.chunk_filesize_list.values() {
             chunks.append(
                 i64::try_from(*file)
                     .unwrap_or_default()
@@ -796,9 +785,8 @@ impl DownloadManifest {
 
         // File Manifest
 
-        let mut files: Vec<u8> = Vec::new();
         // version
-        files.push(0);
+        let mut files: Vec<u8> = vec![0];
 
         // count
         files.append(
@@ -829,9 +817,7 @@ impl DownloadManifest {
 
         // flags
         // TODO: Figure out what Epic puts in theirs
-        for _ in &self.file_manifest_list {
-            files.push(0);
-        }
+        files.resize(self.file_manifest_list.len(), 0);
 
         // install tags
         // TODO: Figure out what Epic puts in theirs
@@ -887,10 +873,8 @@ impl DownloadManifest {
         data.append(files.borrow_mut());
 
         // Custom Fields
-
-        let mut custom: Vec<u8> = Vec::new();
         // version
-        custom.push(0);
+        let mut custom: Vec<u8> = vec![0];
 
         match &self.custom_fields {
             None => {
@@ -905,10 +889,10 @@ impl DownloadManifest {
                         .borrow_mut(),
                 );
 
-                for (key, _) in custom_fields {
+                for key in custom_fields.keys() {
                     custom.append(crate::api::utils::write_fstring(key.to_string()).borrow_mut());
                 }
-                for (_, value) in custom_fields {
+                for value in custom_fields.values() {
                     custom.append(crate::api::utils::write_fstring(value.to_string()).borrow_mut());
                 }
             }

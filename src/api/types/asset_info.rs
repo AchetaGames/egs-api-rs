@@ -65,7 +65,7 @@ impl AssetInfo {
     }
 
     /// Get release info based on the release id
-    pub fn release_info(&self, id: &String) -> Option<ReleaseInfo> {
+    pub fn release_info(&self, id: &str) -> Option<ReleaseInfo> {
         if let Some(releases) = self.release_info.clone() {
             for release in releases {
                 if release.id.clone().unwrap_or_default().eq(id) {
@@ -77,7 +77,7 @@ impl AssetInfo {
     }
 
     /// Get release info based on the release name
-    pub fn release_name(&self, name: &String) -> Option<ReleaseInfo> {
+    pub fn release_name(&self, name: &str) -> Option<ReleaseInfo> {
         if let Some(releases) = self.release_info.clone() {
             for release in releases {
                 if release.app_id.clone().unwrap_or_default().eq(name) {

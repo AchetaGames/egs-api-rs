@@ -3,6 +3,7 @@ use std::convert::TryInto;
 use std::ops::Shl;
 use std::borrow::BorrowMut;
 use std::num::ParseIntError;
+use std::cmp::Ordering;
 
 /// Convert numbers in the Download Manifest from little indian and %03d concatenated string
 pub fn blob_to_num<T: Into<String>>(str: T) -> u128 {
@@ -11,14 +12,11 @@ pub fn blob_to_num<T: Into<String>>(str: T) -> u128 {
     let string = str.into();
     for i in (0..string.len()).step_by(3) {
         if let Ok(n) = string[i..i + 3].parse::<u128>() {
-            num += match n.checked_shl(shift as u32) {
-                None => 0,
-                Some(number) => number,
-            };
+            num += n.checked_shl(shift as u32).unwrap_or(0);
             shift += 8;
         }
     }
-    return num;
+    num
 }
 
 /// Convert BIG numbers in the Download Manifest from little indian and %03d concatenated string
@@ -32,55 +30,57 @@ pub fn bigblob_to_num<T: Into<String>>(str: T) -> BigUint {
             shift += 8;
         }
     }
-    return num;
+    num
 }
 
-pub(crate) fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
+pub(crate) fn do_vecs_match<T: PartialEq>(a: &[T], b: &[T]) -> bool {
     let matching = a.iter().zip(b.iter()).filter(|&(a, b)| a == b).count();
     matching == a.len() && matching == b.len()
 }
 
-pub(crate) fn read_le(buffer: &Vec<u8>, position: &mut usize) -> u32 {
+pub(crate) fn read_le(buffer: &[u8], position: &mut usize) -> u32 {
     *position += 4;
     u32::from_le_bytes(buffer[*position - 4..*position].try_into().unwrap())
 }
 
-pub(crate) fn read_le_signed(buffer: &Vec<u8>, position: &mut usize) -> i32 {
+pub(crate) fn read_le_signed(buffer: &[u8], position: &mut usize) -> i32 {
     *position += 4;
     i32::from_le_bytes(buffer[*position - 4..*position].try_into().unwrap())
 }
 
-pub(crate) fn read_le_64(buffer: &Vec<u8>, position: &mut usize) -> u64 {
+pub(crate) fn read_le_64(buffer: &[u8], position: &mut usize) -> u64 {
     *position += 8;
     u64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
 }
 
-pub(crate) fn read_le_64_signed(buffer: &Vec<u8>, position: &mut usize) -> i64 {
+pub(crate) fn read_le_64_signed(buffer: &[u8], position: &mut usize) -> i64 {
     *position += 8;
     i64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
 }
 
-pub(crate) fn read_fstring(buffer: &Vec<u8>, position: &mut usize) -> Option<String> {
+pub(crate) fn read_fstring(buffer: &[u8], position: &mut usize) -> Option<String> {
     let mut length = read_le_signed(buffer, position);
-    if length < 0 {
-        length *= -2;
-        *position += length as usize;
-        Some(String::from_utf16_lossy(
-            buffer[*position - length as usize..*position - 2]
-                .chunks_exact(2)
-                .into_iter()
-                .map(|a| u16::from_ne_bytes([a[0], a[1]]))
-                .collect::<Vec<u16>>()
-                .as_slice(),
-        ))
-    } else if length > 0 {
-        *position += length as usize;
-        match std::str::from_utf8(&buffer[*position - length as usize..*position - 1]) {
-            Ok(s) => Some(s.to_string()),
-            Err(_) => None,
+    match length.cmp(&0) {
+        Ordering::Less => {
+            length *= -2;
+            *position += length as usize;
+            Some(String::from_utf16_lossy(
+                buffer[*position - length as usize..*position - 2]
+                    .chunks_exact(2)
+                    .into_iter()
+                    .map(|a| u16::from_ne_bytes([a[0], a[1]]))
+                    .collect::<Vec<u16>>()
+                    .as_slice(),
+            ))
         }
-    } else {
-        None
+        Ordering::Equal => { None }
+        Ordering::Greater => {
+            *position += length as usize;
+            match std::str::from_utf8(&buffer[*position - length as usize..*position - 1]) {
+                Ok(s) => Some(s.to_string()),
+                Err(_) => None,
+            }
+        }
     }
 }
 
@@ -100,7 +100,7 @@ pub(crate) fn write_fstring(string: String) -> Vec<u8> {
                 .to_vec()
                 .borrow_mut(),
         );
-        meta.append(string.clone().into_bytes().borrow_mut());
+        meta.append(string.into_bytes().borrow_mut());
         meta.push(0);
     } else {
         meta.append(0u32.to_le_bytes().to_vec().borrow_mut())
@@ -134,6 +134,7 @@ mod tests {
     fn blob_to_num_test() {
         assert_eq!(blob_to_num("165045004000"), 273829)
     }
+
     #[test]
     fn blob_to_bignum_test() {
         assert_eq!(

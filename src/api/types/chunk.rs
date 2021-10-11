@@ -45,10 +45,7 @@ impl Chunk {
                 crate::api::utils::read_le(&buffer, &mut position)
             ),
             hash: crate::api::utils::read_le_64(&buffer, &mut position),
-            compressed: match buffer[position] {
-                0 => false,
-                _ => true,
-            },
+            compressed: !matches!(buffer[position], 0),
             sha_hash: None,
             hash_type: None,
             uncompressed_size: None,

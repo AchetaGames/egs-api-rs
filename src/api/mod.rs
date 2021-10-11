@@ -225,10 +225,9 @@ impl EpicAPI {
                 .parse()
                 .unwrap(),
         );
-        let client = reqwest::Client::builder()
+        reqwest::Client::builder()
             .default_headers(headers)
-            .cookie_store(true);
-        client
+            .cookie_store(true)
     }
 
     pub async fn start_session(
@@ -296,12 +295,12 @@ impl EpicAPI {
 
     fn authorized_get_client(&self, url: Url) -> RequestBuilder {
         let client = EpicAPI::build_client().build().unwrap();
-        self.set_authorization_header(client.clone().get(url))
+        self.set_authorization_header(client.get(url))
     }
 
     fn authorized_post_client(&self, url: Url) -> RequestBuilder {
         let client = EpicAPI::build_client().build().unwrap();
-        self.set_authorization_header(client.clone().post(url))
+        self.set_authorization_header(client.post(url))
     }
 
     fn set_authorization_header(&self, rb: RequestBuilder) -> RequestBuilder {
@@ -347,7 +346,7 @@ impl EpicAPI {
                 }
             }
         };
-        return false;
+        false
     }
 
     pub async fn assets(
@@ -355,8 +354,8 @@ impl EpicAPI {
         platform: Option<String>,
         label: Option<String>,
     ) -> Result<Vec<EpicAsset>, EpicAPIError> {
-        let plat = platform.unwrap_or("Windows".to_string());
-        let lab = label.unwrap_or("Live".to_string());
+        let plat = platform.unwrap_or_else(|| "Windows".to_string());
+        let lab = label.unwrap_or_else(|| "Live".to_string());
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/{}?label={}", plat, lab);
         match self
             .authorized_get_client(Url::parse(&url).unwrap())
@@ -396,17 +395,17 @@ impl EpicAPI {
         item_id: Option<String>,
         app: Option<String>,
     ) -> Result<AssetManifest, EpicAPIError> {
-        if let None = namespace {
+        if namespace.is_none() {
             return Err(EpicAPIError::InvalidParams);
         };
-        if let None = item_id {
+        if item_id.is_none() {
             return Err(EpicAPIError::InvalidParams);
         };
-        if let None = app {
+        if app.is_none() {
             return Err(EpicAPIError::InvalidParams);
         };
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.clone().unwrap_or("Windows".to_string()), namespace.clone().unwrap(), item_id.clone().unwrap(), app.clone().unwrap(), label.clone().unwrap_or("Live".to_string()));
+                          platform.clone().unwrap_or_else(|| "Windows".to_string()), namespace.clone().unwrap(), item_id.clone().unwrap(), app.clone().unwrap(), label.clone().unwrap_or_else(|| "Live".to_string()));
         match self
             .authorized_get_client(Url::parse(&url).unwrap())
             .send()
@@ -444,11 +443,12 @@ impl EpicAPI {
         }
     }
 
-    pub async fn asset_download_manifest(
+    pub async fn asset_download_manifests(
         &self,
         asset_manifest: AssetManifest,
-    ) -> Result<DownloadManifest, EpicAPIError> {
+    ) -> Vec<DownloadManifest> {
         let base_urls = asset_manifest.url_csv();
+        let mut result: Vec<DownloadManifest> = Vec::new();
         for elem in asset_manifest.elements {
             for manifest in elem.manifests {
                 let mut queries: Vec<String> = Vec::new();
@@ -458,14 +458,13 @@ impl EpicAPI {
                 }
                 let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
                 let client = EpicAPI::build_client().build().unwrap();
-                return match client.get(Url::from_str(&url).unwrap()).send().await {
+                match client.get(Url::from_str(&url).unwrap()).send().await {
                     Ok(response) => {
                         if response.status() == reqwest::StatusCode::OK {
                             match response.bytes().await {
                                 Ok(data) => match DownloadManifest::parse(data.to_vec()) {
                                     None => {
                                         error!("Unable to parse the Download Manifest");
-                                        Err(EpicAPIError::Unknown)
                                     }
                                     Some(mut man) => {
                                         let mut url = manifest.uri.clone();
@@ -484,26 +483,26 @@ impl EpicAPI {
                                             base_urls.clone(),
                                         );
 
-                                        if let Some(id) = asset_manifest.item_id {
+                                        if let Some(id) = asset_manifest.item_id.clone() {
                                             man.set_custom_field(
                                                 "CatalogItemId".to_string(),
                                                 id.clone(),
                                             );
                                         }
-                                        if let Some(label) = asset_manifest.label {
+                                        if let Some(label) = asset_manifest.label.clone() {
                                             man.set_custom_field(
                                                 "BuildLabel".to_string(),
                                                 label.clone(),
                                             );
                                         }
-                                        if let Some(ns) = asset_manifest.namespace {
+                                        if let Some(ns) = asset_manifest.namespace.clone() {
                                             man.set_custom_field(
                                                 "CatalogNamespace".to_string(),
                                                 ns.clone(),
                                             );
                                         }
 
-                                        if let Some(app) = asset_manifest.app {
+                                        if let Some(app) = asset_manifest.app.clone() {
                                             man.set_custom_field(
                                                 "CatalogAssetName".to_string(),
                                                 app.clone(),
@@ -514,12 +513,11 @@ impl EpicAPI {
                                             "SourceURL".to_string(),
                                             url.to_string(),
                                         );
-                                        Ok(man)
+                                        result.push(man)
                                     }
                                 },
                                 Err(e) => {
                                     error!("{:?}", e);
-                                    Err(EpicAPIError::Unknown)
                                 }
                             }
                         } else {
@@ -528,17 +526,15 @@ impl EpicAPI {
                                 response.status(),
                                 response.text().await.unwrap()
                             );
-                            Err(EpicAPIError::Unknown)
                         }
                     }
                     Err(e) => {
                         error!("{:?}", e);
-                        Err(EpicAPIError::Unknown)
                     }
                 }
             }
-        }
-        Err(EpicAPIError::Unknown)
+        };
+        result
     }
 
     pub async fn asset_info(
@@ -578,9 +574,8 @@ impl EpicAPI {
     }
 
     pub async fn game_token(&self) -> Result<GameToken, EpicAPIError> {
-        let url = format!(
-            "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange"
-        );
+        let url =
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange".to_string();
         match self
             .authorized_get_client(Url::parse(&url).unwrap())
             .send()
