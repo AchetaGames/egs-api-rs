@@ -18,7 +18,6 @@
 //!  - Get Library Items
 //!  - Generate download links for chunks
 
-use chrono;
 use log::{error, info, warn};
 use reqwest::header;
 
@@ -29,7 +28,7 @@ use api::types::entitlement::Entitlement;
 use api::types::library::Library;
 
 use crate::api::types::epic_asset::EpicAsset;
-use crate::api::{EpicAPI, EpicAPIError, UserData};
+use crate::api::{EpicAPI, UserData};
 
 /// Module for authenticated API communication
 pub mod api;
@@ -57,7 +56,7 @@ impl EpicGames {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     /// Get User details
@@ -99,10 +98,7 @@ impl EpicGames {
             .build()
             .unwrap();
 
-        match client.get(&url).send().await {
-            Ok(_resp) => {}
-            _ => {}
-        }
+        if let Ok(_resp) = client.get(&url).send().await {}
 
         let mut xsrf_token: String = "".to_string();
 
@@ -128,10 +124,7 @@ impl EpicGames {
             Ok(resp) => {
                 if resp.status() == reqwest::StatusCode::OK {
                     let echo_json: serde_json::Value = resp.json().await.unwrap();
-                    match echo_json["code"].as_str() {
-                        Some(t) => Some(t.to_string()),
-                        None => None,
-                    }
+                    echo_json["code"].as_str().map(|t| t.to_string())
                 } else {
                     let echo_json: serde_json::Value = resp.json().await.unwrap();
                     error!("{:?}", echo_json);
@@ -145,10 +138,7 @@ impl EpicGames {
 
     /// Start session with auth code
     pub async fn auth_code(&mut self, code: String) -> bool {
-        match self.egs.start_session(Some(code)).await {
-            Ok(b) => b,
-            Err(_) => false,
-        }
+        self.egs.start_session(Some(code)).await.unwrap_or(false)
     }
 
     /// Invalidate existing session
@@ -267,13 +257,10 @@ impl EpicGames {
     }
 
     /// Returns a DownloadManifest for a specified file manifest
-    pub async fn asset_download_manifest(
+    pub async fn asset_download_manifests(
         &self,
         manifest: AssetManifest,
-    ) -> Result<DownloadManifest, EpicAPIError> {
-        match self.egs.asset_download_manifest(manifest).await {
-            Ok(manifest) => Ok(manifest),
-            Err(e) => Err(e),
-        }
+    ) -> Vec<DownloadManifest> {
+        self.egs.asset_download_manifests(manifest).await
     }
 }
