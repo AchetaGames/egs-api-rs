@@ -192,7 +192,7 @@ impl DownloadManifest {
                 guid.clone(),
                 Url::parse(&format!(
                     "{}/{}/{:02}/{:016X}_{}.chunk",
-                    url, chunk_dir, group_num, hash, guid
+                    url, chunk_dir, group_num, hash, guid.to_uppercase()
                 ))
                     .unwrap(),
             );

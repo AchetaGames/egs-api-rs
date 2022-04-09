@@ -85,10 +85,12 @@ impl EpicGames {
         );
         let url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
         let mut store = cookie_store::CookieStore::load_json("".as_bytes()).unwrap();
-        store.parse(
-            "EPIC_COUNTRY=US",
-            &reqwest::Url::parse("https://www.epicgames.com").unwrap(),
-        ).unwrap();
+        store
+            .parse(
+                "EPIC_COUNTRY=US",
+                &reqwest::Url::parse("https://www.epicgames.com").unwrap(),
+            )
+            .unwrap();
         let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(store);
         let cookie_store = std::sync::Arc::new(cookie_store);
         let client = reqwest::Client::builder()
@@ -257,10 +259,7 @@ impl EpicGames {
     }
 
     /// Returns a DownloadManifest for a specified file manifest
-    pub async fn asset_download_manifests(
-        &self,
-        manifest: AssetManifest,
-    ) -> Vec<DownloadManifest> {
+    pub async fn asset_download_manifests(&self, manifest: AssetManifest) -> Vec<DownloadManifest> {
         self.egs.asset_download_manifests(manifest).await
     }
 }
