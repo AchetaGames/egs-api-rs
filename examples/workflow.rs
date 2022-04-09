@@ -116,10 +116,7 @@ async fn main() {
                 .await;
             println!("{:?}", manifest);
 
-            let download_manifest = egs.asset_download_manifest(manifest.unwrap()).await;
-            if let Ok(_dm) = download_manifest {
-                // println!("{:#?}", dm.get_files());
-            }
+            let download_manifest = egs.asset_download_manifests(manifest.unwrap()).await;
         }
     }
 }
