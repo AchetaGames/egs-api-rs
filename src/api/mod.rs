@@ -456,7 +456,7 @@ impl EpicAPI {
                 for query in manifest.query_params {
                     queries.push(format!("{}={}", query.name, query.value));
                 }
-                let url = format!("{}?{}", manifest.uri.to_string(), queries.join("&"));
+                let url = format!("{}?{}", manifest.uri, queries.join("&"));
                 let client = EpicAPI::build_client().build().unwrap();
                 match client.get(Url::from_str(&url).unwrap()).send().await {
                     Ok(response) => {
