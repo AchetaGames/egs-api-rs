@@ -316,7 +316,7 @@ impl DownloadManifest {
             let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
             z.read_to_end(&mut data).unwrap();
-            if !crate::api::utils::do_vecs_match(&sha_hash.to_vec(), &Sha1::digest(&data).to_vec())
+            if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data))
             {
                 error!("The extracted hash does not match");
                 return None;
