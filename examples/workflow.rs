@@ -32,6 +32,8 @@ async fn main() {
                 .account_ids_details(vec![egs.user_details().account_id.unwrap_or_default()])
                 .await;
             println!("Account info: {:?}", info);
+            let friends = egs.account_friends(true).await;
+            println!("Friends: {:?}", friends);
             // let assets = egs.list_assets().await;
             // let mut ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();
             // let mut non_ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();

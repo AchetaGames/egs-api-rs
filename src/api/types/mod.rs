@@ -21,3 +21,6 @@ pub mod chunk;
 
 /// Account structures
 pub mod account;
+
+/// Friends structures
+pub mod friends;

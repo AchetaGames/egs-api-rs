@@ -17,6 +17,7 @@ use types::library::Library;
 
 use crate::api::types::account::{AccountData, AccountInfo};
 use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::friends::Friend;
 use std::str::FromStr;
 
 /// Module holding the API types
@@ -313,6 +314,46 @@ impl EpicAPI {
         query.push_str(&ids.join("&accountId="));
         parsed_url.set_query(Some(&query));
         match self.authorized_get_client(parsed_url).send().await {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::OK {
+                    match response.json().await {
+                        Ok(details) => Ok(details),
+                        Err(e) => {
+                            error!("{:?}", e);
+                            Err(EpicAPIError::Unknown)
+                        }
+                    }
+                } else {
+                    warn!(
+                        "{} result: {}",
+                        response.status(),
+                        response.text().await.unwrap()
+                    );
+                    Err(EpicAPIError::Unknown)
+                }
+            }
+            Err(e) => {
+                error!("{:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
+    pub async fn account_friends(
+        &mut self,
+        include_pending: bool,
+    ) -> Result<Vec<Friend>, EpicAPIError> {
+        let id = match &self.user_data.account_id {
+            Some(id) => id,
+            None => return Err(EpicAPIError::InvalidParams),
+        };
+        let url = format!(
+            "https://friends-public-service-prod06.ol.epicgames.com/friends/api/public/friends/{}?includePending={}", id, include_pending);
+        match self
+            .authorized_get_client(Url::parse(&url).unwrap())
+            .send()
+            .await
+        {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json().await {

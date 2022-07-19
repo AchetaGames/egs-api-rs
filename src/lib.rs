@@ -29,6 +29,7 @@ use api::types::library::Library;
 
 use crate::api::types::account::{AccountData, AccountInfo, UserData};
 use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::friends::Friend;
 use crate::api::EpicAPI;
 
 /// Module for authenticated API communication
@@ -242,6 +243,14 @@ impl EpicGames {
     /// Returns account id info
     pub async fn account_ids_details(&mut self, ids: Vec<String>) -> Option<Vec<AccountInfo>> {
         match self.egs.account_ids_details(ids).await {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns account id info
+    pub async fn account_friends(&mut self, include_pending: bool) -> Option<Vec<Friend>> {
+        match self.egs.account_friends(include_pending).await {
             Ok(a) => Some(a),
             Err(_) => None,
         }
