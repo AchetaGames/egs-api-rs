@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
@@ -154,4 +155,38 @@ impl UserData {
             self.error_code = Some(n)
         }
     }
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountInfo {
+    pub display_name: String,
+    pub external_auths: HashMap<String, ExternalAuth>,
+    pub id: String,
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalAuth {
+    pub account_id: String,
+    pub auth_ids: Vec<AuthId>,
+    pub date_added: Option<String>,
+    pub avatar: Option<String>,
+    pub external_auth_id: Option<String>,
+    pub external_auth_id_type: String,
+    pub external_display_name: String,
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub external_auth_secondary_id: Option<String>,
+}
+
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthId {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_field: String,
 }

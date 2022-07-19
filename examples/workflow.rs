@@ -28,6 +28,10 @@ async fn main() {
             egs.login().await;
             let details = egs.account_details().await;
             println!("Account details: {:?}", details);
+            let info = egs
+                .account_ids_details(vec![egs.user_details().account_id.unwrap_or_default()])
+                .await;
+            println!("Account info: {:?}", info);
             // let assets = egs.list_assets().await;
             // let mut ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();
             // let mut non_ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();

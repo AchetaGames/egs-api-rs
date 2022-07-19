@@ -15,7 +15,7 @@ use types::download_manifest::DownloadManifest;
 use types::entitlement::Entitlement;
 use types::library::Library;
 
-use crate::api::types::account::AccountData;
+use crate::api::types::account::{AccountData, AccountInfo};
 use crate::api::types::epic_asset::EpicAsset;
 use std::str::FromStr;
 
@@ -273,6 +273,46 @@ impl EpicAPI {
             .send()
             .await
         {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::OK {
+                    match response.json().await {
+                        Ok(details) => Ok(details),
+                        Err(e) => {
+                            error!("{:?}", e);
+                            Err(EpicAPIError::Unknown)
+                        }
+                    }
+                } else {
+                    warn!(
+                        "{} result: {}",
+                        response.status(),
+                        response.text().await.unwrap()
+                    );
+                    Err(EpicAPIError::Unknown)
+                }
+            }
+            Err(e) => {
+                error!("{:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
+    pub async fn account_ids_details(
+        &mut self,
+        ids: Vec<String>,
+    ) -> Result<Vec<AccountInfo>, EpicAPIError> {
+        if ids.is_empty() {
+            return Err(EpicAPIError::InvalidParams);
+        }
+        let url =
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account"
+                .to_string();
+        let mut parsed_url = Url::parse(&url).unwrap();
+        let mut query = "accountId=".to_string();
+        query.push_str(&ids.join("&accountId="));
+        parsed_url.set_query(Some(&query));
+        match self.authorized_get_client(parsed_url).send().await {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
                     match response.json().await {
