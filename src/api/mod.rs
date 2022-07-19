@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-use chrono::{DateTime, Utc};
 use log::{debug, error, info, warn};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, ClientBuilder, RequestBuilder, Response};
-use serde::{Deserialize, Serialize};
 use url::Url;
 
+use types::account::UserData;
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use types::asset_manifest::AssetManifest;
 use types::download_manifest::DownloadManifest;
 use types::entitlement::Entitlement;
 use types::library::Library;
 
+use crate::api::types::account::AccountData;
 use crate::api::types::epic_asset::EpicAsset;
 use std::str::FromStr;
 
@@ -24,134 +24,6 @@ pub mod types;
 
 /// Various API Utils
 pub mod utils;
-
-/// Structure that holds all user data
-///
-/// Needed for login
-#[allow(missing_docs)]
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UserData {
-    access_token: Option<String>,
-    pub expires_in: Option<i64>,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub token_type: Option<String>,
-    refresh_token: Option<String>,
-    pub refresh_expires: Option<i64>,
-    pub refresh_expires_at: Option<DateTime<Utc>>,
-    pub account_id: Option<String>,
-    pub client_id: Option<String>,
-    pub internal_client: Option<bool>,
-    pub client_service: Option<String>,
-    #[serde(rename = "displayName")]
-    pub display_name: Option<String>,
-    pub app: Option<String>,
-    pub in_app_id: Option<String>,
-    pub device_id: Option<String>,
-    #[serde(rename = "errorMessage")]
-    pub error_message: Option<String>,
-    #[serde(rename = "errorCode")]
-    pub error_code: Option<String>,
-}
-
-impl UserData {
-    /// Creates new UserData Structure
-    pub fn new() -> Self {
-        UserData {
-            access_token: None,
-            expires_in: None,
-            expires_at: None,
-            token_type: None,
-            refresh_token: None,
-            refresh_expires: None,
-            refresh_expires_at: None,
-            account_id: None,
-            client_id: None,
-            internal_client: None,
-            client_service: None,
-            display_name: None,
-            app: None,
-            in_app_id: None,
-            device_id: None,
-            error_message: None,
-            error_code: None,
-        }
-    }
-
-    /// Get access token
-    pub fn access_token(&self) -> Option<String> {
-        self.access_token.clone()
-    }
-
-    /// Get refresh token
-    pub fn refresh_token(&self) -> Option<String> {
-        self.refresh_token.clone()
-    }
-
-    /// Set access token
-    pub fn set_access_token(&mut self, token: Option<String>) {
-        self.access_token = token;
-    }
-
-    /// Set refresh token
-    pub fn set_refresh_token(&mut self, token: Option<String>) {
-        self.refresh_token = token;
-    }
-
-    /// Updates only the present values in the existing user data
-    pub fn update(&mut self, new: UserData) {
-        if let Some(n) = new.access_token {
-            self.access_token = Some(n)
-        }
-        if let Some(n) = new.expires_in {
-            self.expires_in = Some(n)
-        }
-        if let Some(n) = new.expires_at {
-            self.expires_at = Some(n)
-        }
-        if let Some(n) = new.token_type {
-            self.token_type = Some(n)
-        }
-        if let Some(n) = new.refresh_token {
-            self.refresh_token = Some(n)
-        }
-        if let Some(n) = new.refresh_expires {
-            self.refresh_expires = Some(n)
-        }
-        if let Some(n) = new.refresh_expires_at {
-            self.refresh_expires_at = Some(n)
-        }
-        if let Some(n) = new.account_id {
-            self.account_id = Some(n)
-        }
-        if let Some(n) = new.client_id {
-            self.client_id = Some(n)
-        }
-        if let Some(n) = new.internal_client {
-            self.internal_client = Some(n)
-        }
-        if let Some(n) = new.client_service {
-            self.client_service = Some(n)
-        }
-        if let Some(n) = new.display_name {
-            self.display_name = Some(n)
-        }
-        if let Some(n) = new.app {
-            self.app = Some(n)
-        }
-        if let Some(n) = new.in_app_id {
-            self.in_app_id = Some(n)
-        }
-        if let Some(n) = new.device_id {
-            self.device_id = Some(n)
-        }
-        if let Some(n) = new.error_message {
-            self.error_message = Some(n)
-        }
-        if let Some(n) = new.error_code {
-            self.error_code = Some(n)
-        }
-    }
-}
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct EpicAPI {
@@ -387,6 +259,45 @@ impl EpicAPI {
         }
     }
 
+    pub async fn account_details(&mut self) -> Result<AccountData, EpicAPIError> {
+        let id = match &self.user_data.account_id {
+            Some(id) => id,
+            None => return Err(EpicAPIError::InvalidParams),
+        };
+        let url = format!(
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account/{}",
+            id
+        );
+        match self
+            .authorized_get_client(Url::parse(&url).unwrap())
+            .send()
+            .await
+        {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::OK {
+                    match response.json().await {
+                        Ok(details) => Ok(details),
+                        Err(e) => {
+                            error!("{:?}", e);
+                            Err(EpicAPIError::Unknown)
+                        }
+                    }
+                } else {
+                    warn!(
+                        "{} result: {}",
+                        response.status(),
+                        response.text().await.unwrap()
+                    );
+                    Err(EpicAPIError::Unknown)
+                }
+            }
+            Err(e) => {
+                error!("{:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
     pub async fn asset_manifest(
         &self,
         platform: Option<String>,
@@ -533,7 +444,7 @@ impl EpicAPI {
                     }
                 }
             }
-        };
+        }
         result
     }
 
@@ -575,7 +486,8 @@ impl EpicAPI {
 
     pub async fn game_token(&self) -> Result<GameToken, EpicAPIError> {
         let url =
-            "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange".to_string();
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange"
+                .to_string();
         match self
             .authorized_get_client(Url::parse(&url).unwrap())
             .send()

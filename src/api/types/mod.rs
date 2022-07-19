@@ -18,3 +18,6 @@ pub mod entitlement;
 
 /// Downloaded chunk module
 pub mod chunk;
+
+/// Account structures
+pub mod account;

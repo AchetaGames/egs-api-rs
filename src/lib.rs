@@ -27,8 +27,9 @@ use api::types::download_manifest::DownloadManifest;
 use api::types::entitlement::Entitlement;
 use api::types::library::Library;
 
+use crate::api::types::account::{AccountData, UserData};
 use crate::api::types::epic_asset::EpicAsset;
-use crate::api::{EpicAPI, UserData};
+use crate::api::EpicAPI;
 
 /// Module for authenticated API communication
 pub mod api;
@@ -222,6 +223,14 @@ impl EpicGames {
     pub async fn asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
         match self.egs.asset_info(asset.clone()).await {
             Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns account details
+    pub async fn account_details(&mut self) -> Option<AccountData> {
+        match self.egs.account_details().await {
+            Ok(a) => Some(a),
             Err(_) => None,
         }
     }
