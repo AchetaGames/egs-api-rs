@@ -20,8 +20,8 @@ log = "0.4"
 sha-1 = "0.10"
 flate2 = "1.0.20"
 num = "0.4.0"
-reqwest_cookie_store = "0.2.0"
-cookie_store = "0.15"
+reqwest_cookie_store = "0.3.0"
+cookie_store = "0.16"
 
 [dependencies.tokio]
 version = "1.10"
@@ -32,4 +32,4 @@ version = "1.0.123"
 features = ["derive"]
 
 [dev-dependencies]
-webbrowser = "0.6"
+webbrowser = "0.7"
