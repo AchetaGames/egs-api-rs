@@ -27,8 +27,10 @@ use api::types::download_manifest::DownloadManifest;
 use api::types::entitlement::Entitlement;
 use api::types::library::Library;
 
+use crate::api::types::account::{AccountData, AccountInfo, UserData};
 use crate::api::types::epic_asset::EpicAsset;
-use crate::api::{EpicAPI, UserData};
+use crate::api::types::friends::Friend;
+use crate::api::EpicAPI;
 
 /// Module for authenticated API communication
 pub mod api;
@@ -192,8 +194,12 @@ impl EpicGames {
     }
 
     /// Returns all assets
-    pub async fn list_assets(&mut self) -> Vec<EpicAsset> {
-        match self.egs.assets(None, None).await {
+    pub async fn list_assets(
+        &mut self,
+        platform: Option<String>,
+        label: Option<String>,
+    ) -> Vec<EpicAsset> {
+        match self.egs.assets(platform, label).await {
             Ok(b) => b,
             Err(_) => Vec::new(),
         }
@@ -222,6 +228,30 @@ impl EpicGames {
     pub async fn asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
         match self.egs.asset_info(asset.clone()).await {
             Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns account details
+    pub async fn account_details(&mut self) -> Option<AccountData> {
+        match self.egs.account_details().await {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns account id info
+    pub async fn account_ids_details(&mut self, ids: Vec<String>) -> Option<Vec<AccountInfo>> {
+        match self.egs.account_ids_details(ids).await {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns account id info
+    pub async fn account_friends(&mut self, include_pending: bool) -> Option<Vec<Friend>> {
+        match self.egs.account_friends(include_pending).await {
+            Ok(a) => Some(a),
             Err(_) => None,
         }
     }
