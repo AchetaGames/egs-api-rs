@@ -1,5 +1,6 @@
 use std::io::{self};
 
+use egs_api::api::types::asset_info::GameToken;
 use egs_api::api::types::epic_asset::EpicAsset;
 use egs_api::EpicGames;
 use std::collections::{HashMap, HashSet};
@@ -7,7 +8,7 @@ use webbrowser;
 
 #[tokio::main]
 async fn main() {
-    if !webbrowser::open("https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect").is_ok() {
+    if webbrowser::open("https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect").is_err() {
         println!("Please go to https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect")
     }
     println!("Please enter the 'sid' value from the JSON response");
@@ -34,6 +35,15 @@ async fn main() {
             println!("Account info: {:?}", info);
             let friends = egs.account_friends(true).await;
             println!("Friends: {:?}", friends);
+
+            // let code = egs.game_token().await;
+            // if let Some(c) = code {
+            //     let authorized_url = format!("https://www.epicgames.com/id/exchange?exchangeCode={}&redirectUrl=https%3A%2F%2Fwww.unrealengine.com%2Fdashboard%3Flang%3Den", c.code);
+            //     if webbrowser::open(&authorized_url).is_err() {
+            //         println!("Please go to {}", authorized_url)
+            //     }
+            // }
+
             // let assets = egs.list_assets().await;
             // let mut ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();
             // let mut non_ueasset_map: HashMap<String, HashMap<String, EpicAsset>> = HashMap::new();
