@@ -1,24 +1,21 @@
+use crate::api::types::account::{AccountData, AccountInfo};
+use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::friends::Friend;
+use log::{debug, error, info, warn};
+use reqwest::header::HeaderMap;
+use reqwest::{Client, ClientBuilder, RequestBuilder, Response};
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-
-use log::{debug, error, info, warn};
-use reqwest::header::HeaderMap;
-use reqwest::{Client, ClientBuilder, RequestBuilder, Response};
-use url::Url;
-
+use std::str::FromStr;
 use types::account::UserData;
 use types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use types::asset_manifest::AssetManifest;
 use types::download_manifest::DownloadManifest;
 use types::entitlement::Entitlement;
 use types::library::Library;
-
-use crate::api::types::account::{AccountData, AccountInfo};
-use crate::api::types::epic_asset::EpicAsset;
-use crate::api::types::friends::Friend;
-use std::str::FromStr;
+use url::Url;
 
 /// Module holding the API types
 pub mod types;
@@ -94,9 +91,13 @@ impl EpicAPI {
         let mut headers = HeaderMap::new();
         headers.insert(
             "User-Agent",
-            "UELauncher/12.0.5-15338009+++Portal+Release-Live Windows/6.1.7601.1.0.64bit"
+            "UELauncher/UELauncher/14.1.8-21592140+++Portal+Release-Live Windows/10.0.17763.1.0.64bit"
                 .parse()
                 .unwrap(),
+        );
+        headers.insert(
+            "X-Epic-Correlation-ID",
+            "UE4-615b8f2b4cc88445563fa7a99103eeb7-77F8D1EB4A6CA57DC5797498E13DCAF9-0DCB0C864500976718BB9287AA2DFF4F".parse().unwrap()
         );
         reqwest::Client::builder()
             .default_headers(headers)
@@ -106,16 +107,24 @@ impl EpicAPI {
     pub async fn start_session(
         &mut self,
         exchange_token: Option<String>,
+        authorization_code: Option<String>,
     ) -> Result<bool, EpicAPIError> {
         let params = match exchange_token {
-            None => [
-                ("grant_type".to_string(), "refresh_token".to_string()),
-                (
-                    "refresh_token".to_string(),
-                    self.user_data.refresh_token.clone().unwrap(),
-                ),
-                ("token_type".to_string(), "eg1".to_string()),
-            ],
+            None => match authorization_code {
+                None => [
+                    ("grant_type".to_string(), "refresh_token".to_string()),
+                    (
+                        "refresh_token".to_string(),
+                        self.user_data.refresh_token.clone().unwrap(),
+                    ),
+                    ("token_type".to_string(), "eg1".to_string()),
+                ],
+                Some(auth) => [
+                    ("grant_type".to_string(), "authorization_code".to_string()),
+                    ("code".to_string(), auth),
+                    ("token_type".to_string(), "eg1".to_string()),
+                ],
+            },
             Some(exchange) => [
                 ("grant_type".to_string(), "exchange_code".to_string()),
                 ("exchange_code".to_string(), exchange),
@@ -134,9 +143,7 @@ impl EpicAPI {
             .send()
             .await
         {
-            Ok(response) => {
-                return self.handle_login_response(response).await;
-            }
+            Ok(response) => self.handle_login_response(response).await,
             Err(e) => {
                 error!("{:?}", e);
                 Err(EpicAPIError::Unknown)

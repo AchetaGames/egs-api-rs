@@ -18,19 +18,16 @@
 //!  - Get Library Items
 //!  - Generate download links for chunks
 
-use log::{error, info, warn};
-use reqwest::header;
-
+use crate::api::types::account::{AccountData, AccountInfo, UserData};
+use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::friends::Friend;
+use crate::api::EpicAPI;
 use api::types::asset_info::{AssetInfo, GameToken};
 use api::types::asset_manifest::AssetManifest;
 use api::types::download_manifest::DownloadManifest;
 use api::types::entitlement::Entitlement;
 use api::types::library::Library;
-
-use crate::api::types::account::{AccountData, AccountInfo, UserData};
-use crate::api::types::epic_asset::EpicAsset;
-use crate::api::types::friends::Friend;
-use crate::api::EpicAPI;
+use log::{error, info, warn};
 
 /// Module for authenticated API communication
 pub mod api;
@@ -71,78 +68,16 @@ impl EpicGames {
         self.egs.user_data.update(user_details);
     }
 
-    /// Authenticate with sid
-    pub async fn auth_sid(&self, sid: &str) -> Option<String> {
-        // get first set of cookies (EPIC_BEARER_TOKEN etc.)
-        let mut headers = header::HeaderMap::new();
-        headers.insert("X-Epic-Event-Action", "login".parse().unwrap());
-        headers.insert("X-Epic-Event-Category", "login".parse().unwrap());
-        headers.insert("X-Epic-Strategy-Flags", "".parse().unwrap());
-        headers.insert("X-Requested-With", "XMLHttpRequest".parse().unwrap());
-        headers.insert(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) EpicGamesLauncher/11.0.1-14907503+++Portal+Release-Live UnrealEngine/4.23.0-14907503+++Portal+Release-Live Chrome/84.0.4147.38 Safari/537.36"
-                .parse()
-                .unwrap(),
-        );
-        let url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
-        let mut store = cookie_store::CookieStore::load_json("".as_bytes()).unwrap();
-        store
-            .parse(
-                "EPIC_COUNTRY=US",
-                &reqwest::Url::parse("https://www.epicgames.com").unwrap(),
-            )
-            .unwrap();
-        let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(store);
-        let cookie_store = std::sync::Arc::new(cookie_store);
-        let client = reqwest::Client::builder()
-            .cookie_store(true)
-            .cookie_provider(cookie_store)
-            .default_headers(headers)
-            .build()
-            .unwrap();
-
-        if let Ok(_resp) = client.get(&url).send().await {}
-
-        let mut xsrf_token: String = "".to_string();
-
-        if let Ok(resp) = client
-            .get("https://www.epicgames.com/id/api/csrf")
-            .send()
-            .await
-        {
-            for cookie in resp.cookies() {
-                if cookie.name().to_lowercase() == "xsrf-token" {
-                    xsrf_token = cookie.value().to_string();
-                    break;
-                }
-            }
-        }
-
-        match client
-            .post("https://www.epicgames.com/id/api/exchange/generate")
-            .header("X-XSRF-TOKEN", xsrf_token)
-            .send()
-            .await
-        {
-            Ok(resp) => {
-                if resp.status() == reqwest::StatusCode::OK {
-                    let echo_json: serde_json::Value = resp.json().await.unwrap();
-                    echo_json["code"].as_str().map(|t| t.to_string())
-                } else {
-                    let echo_json: serde_json::Value = resp.json().await.unwrap();
-                    error!("{:?}", echo_json);
-                    //TODO: return the error from echo_json
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
     /// Start session with auth code
-    pub async fn auth_code(&mut self, code: String) -> bool {
-        self.egs.start_session(Some(code)).await.unwrap_or(false)
+    pub async fn auth_code(
+        &mut self,
+        exchange_token: Option<String>,
+        authorization_code: Option<String>,
+    ) -> bool {
+        self.egs
+            .start_session(exchange_token, authorization_code)
+            .await
+            .unwrap_or(false)
     }
 
     /// Invalidate existing session
@@ -176,7 +111,7 @@ impl EpicGames {
             let now = chrono::offset::Utc::now();
             let td = exp - now;
             if td.num_seconds() > 600 {
-                match self.egs.start_session(None).await {
+                match self.egs.start_session(None, None).await {
                     Ok(b) => {
                         if b {
                             info!("Logged in");
