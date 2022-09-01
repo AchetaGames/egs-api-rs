@@ -42,8 +42,8 @@ pub struct DownloadManifest {
 }
 
 fn deserialize_epic_string<'de, D>(deserializer: D) -> Result<u128, D::Error>
-    where
-        D: de::Deserializer<'de>,
+where
+    D: de::Deserializer<'de>,
 {
     struct JsonStringVisitor;
 
@@ -55,8 +55,8 @@ fn deserialize_epic_string<'de, D>(deserializer: D) -> Result<u128, D::Error>
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             match FromStr::from_str(v) {
                 Ok(str) => Ok(crate::api::utils::blob_to_num::<String>(str)),
@@ -69,8 +69,8 @@ fn deserialize_epic_string<'de, D>(deserializer: D) -> Result<u128, D::Error>
 }
 
 fn deserialize_epic_hash<'de, D>(deserializer: D) -> Result<String, D::Error>
-    where
-        D: de::Deserializer<'de>,
+where
+    D: de::Deserializer<'de>,
 {
     struct JsonStringVisitor;
 
@@ -82,8 +82,8 @@ fn deserialize_epic_hash<'de, D>(deserializer: D) -> Result<String, D::Error>
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
+        where
+            E: de::Error,
         {
             match FromStr::from_str(v) {
                 Ok(str) => {
@@ -103,8 +103,8 @@ fn deserialize_epic_hash<'de, D>(deserializer: D) -> Result<String, D::Error>
 }
 
 fn deserialize_epic_hashmap<'de, D>(deserializer: D) -> Result<HashMap<String, u128>, D::Error>
-    where
-        D: de::Deserializer<'de>,
+where
+    D: de::Deserializer<'de>,
 {
     let str_map = HashMap::<String, String>::deserialize(deserializer)?;
     let original_len = str_map.len();
@@ -192,9 +192,13 @@ impl DownloadManifest {
                 guid.clone(),
                 Url::parse(&format!(
                     "{}/{}/{:02}/{:016X}_{}.chunk",
-                    url, chunk_dir, group_num, hash, guid.to_uppercase()
+                    url,
+                    chunk_dir,
+                    group_num,
+                    hash,
+                    guid.to_uppercase()
                 ))
-                    .unwrap(),
+                .unwrap(),
             );
         }
         Some(result)
@@ -316,8 +320,7 @@ impl DownloadManifest {
             let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
             z.read_to_end(&mut data).unwrap();
-            if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data))
-            {
+            if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data)) {
                 error!("The extracted hash does not match");
                 return None;
             }
@@ -379,7 +382,7 @@ impl DownloadManifest {
         } else {
             None
         }
-            .unwrap_or_default();
+        .unwrap_or_default();
 
         debug!(
             "Manifest metadata read length(needs to match {}): {}",
@@ -987,11 +990,13 @@ struct BinaryChunkPart {
     guid: String,
     offset: u128,
     size: u128,
+    #[allow(dead_code)]
     file_offset: u128,
 }
 
 #[derive(Default, Debug, Clone)]
 struct BinaryChunkInfo {
+    #[allow(dead_code)]
     manifest_version: u128,
     guid: String,
     hash: u128,
