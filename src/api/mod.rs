@@ -461,7 +461,8 @@ impl EpicAPI {
                     Ok(response) => {
                         if response.status() == reqwest::StatusCode::OK {
                             match response.bytes().await {
-                                Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                                Ok(data) => {
+                                    match DownloadManifest::parse(data.to_vec()) {
                                     None => {
                                         error!("Unable to parse the Download Manifest");
                                     }
@@ -514,7 +515,7 @@ impl EpicAPI {
                                         );
                                         result.push(man)
                                     }
-                                },
+                                }},
                                 Err(e) => {
                                     error!("{:?}", e);
                                 }
