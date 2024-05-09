@@ -24,6 +24,8 @@ pub struct DownloadManifest {
     pub app_id: u128,
     pub app_name_string: String,
     pub build_version_string: String,
+    pub uninstall_action_path: String,
+    pub uninstall_action_args: String,
     pub launch_exe_string: String,
     pub launch_command: String,
     pub prereq_ids: Option<Vec<String>>,
@@ -262,6 +264,7 @@ impl DownloadManifest {
     /// Parse DownloadManifest from binary data or Json
     pub fn parse(data: Vec<u8>) -> Option<DownloadManifest> {
         debug!("Attempting to parse download manifest from binary data");
+        debug!("attempted json {:?}", serde_json::from_slice::<DownloadManifest>(data.as_slice()));
         match DownloadManifest::from_vec(data.clone()) {
             None => {
                 debug!("Not binary manifest trying json");
@@ -285,6 +288,8 @@ impl DownloadManifest {
             app_id: 0,
             app_name_string: "".to_string(),
             build_version_string: "".to_string(),
+            uninstall_action_path: "".to_string(),
+            uninstall_action_args: "".to_string(),
             launch_exe_string: "".to_string(),
             launch_command: "".to_string(),
             prereq_ids: None,
@@ -308,6 +313,7 @@ impl DownloadManifest {
             return None;
         }
         let mut header_size = crate::api::utils::read_le(&buffer, &mut position);
+        debug!("Header size: {}", header_size);
         let _size_uncompressed = crate::api::utils::read_le(&buffer, &mut position);
         let _size_compressed = crate::api::utils::read_le(&buffer, &mut position);
         position += 20;
@@ -317,6 +323,7 @@ impl DownloadManifest {
         let _version = crate::api::utils::read_le(&buffer, &mut position);
 
         buffer = if compressed {
+            debug!("Uncompressing");
             let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
             z.read_to_end(&mut data).unwrap();
@@ -377,12 +384,18 @@ impl DownloadManifest {
         res.prereq_args =
             crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
 
-        res.build_version_string = if data_version > 0 {
-            crate::api::utils::read_fstring(&buffer, &mut position)
-        } else {
-            None
+        if data_version >= 1 {
+            res.build_version_string =
+                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
         }
-        .unwrap_or_default();
+        if data_version >= 2 {
+            res.uninstall_action_path =
+                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+            res.uninstall_action_args =
+                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+        }
+
+        debug!("Manifest end position {}", position);
 
         debug!(
             "Manifest metadata read length(needs to match {}): {}",
@@ -393,10 +406,13 @@ impl DownloadManifest {
         // Chunks
 
         let chunk_size = crate::api::utils::read_le(&buffer, &mut position);
+        debug!("Chunk size {}", chunk_size);
 
         let _version = buffer[position];
+        debug!("version: {}", _version);
         position += 1;
 
+        debug!("Chunk count at position: {}", position);
         let count = crate::api::utils::read_le(&buffer, &mut position);
         debug!("Reading {} chunks", count);
 
@@ -473,7 +489,8 @@ impl DownloadManifest {
 
         let filemanifest_size = crate::api::utils::read_le(&buffer, &mut position);
 
-        let _version = buffer[position];
+        let fm_version = buffer[position];
+        debug!("File manifest version: {}", fm_version);
         position += 1;
         let count = crate::api::utils::read_le(&buffer, &mut position);
 
@@ -484,6 +501,9 @@ impl DownloadManifest {
                     .unwrap_or_default(),
                 symlink_target: "".to_string(),
                 hash: vec![],
+                hash_md5: vec![],
+                hash_sha256: vec![],
+                mime_type: "".to_string(),
                 flags: 0,
                 install_tags: vec![],
                 chunk_parts: vec![],
@@ -543,6 +563,26 @@ impl DownloadManifest {
                     }
                     file.chunk_parts.push(chunk);
                 }
+            }
+        }
+
+        if fm_version >= 1 {
+            for file in files.iter_mut() {
+                let has_md5 = crate::api::utils::read_le(&buffer, &mut position);
+                if has_md5!= 0 {
+                    position += 16;
+                    file.hash_md5 = buffer[position - 16..position].try_into().unwrap();
+                }
+            }
+            for file in files.iter_mut() {
+                file.mime_type = crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+            }
+        }
+
+        if fm_version >= 2 {
+            for file in files.iter_mut() {
+                position += 32;
+                file.hash_sha256 = buffer[position - 32..position].try_into().unwrap();
             }
         }
 
@@ -979,6 +1019,9 @@ struct BinaryFileManifest {
     filename: String,
     symlink_target: String,
     hash: Vec<u8>,
+    hash_md5: Vec<u8>,
+    hash_sha256: Vec<u8>,
+    mime_type: String,
     flags: u8,
     install_tags: Vec<String>,
     chunk_parts: Vec<BinaryChunkPart>,
