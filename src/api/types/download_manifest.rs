@@ -24,8 +24,8 @@ pub struct DownloadManifest {
     pub app_id: u128,
     pub app_name_string: String,
     pub build_version_string: String,
-    pub uninstall_action_path: String,
-    pub uninstall_action_args: String,
+    pub uninstall_action_path: Option<String>,
+    pub uninstall_action_args: Option<String>,
     pub launch_exe_string: String,
     pub launch_command: String,
     pub prereq_ids: Option<Vec<String>>,
@@ -288,8 +288,8 @@ impl DownloadManifest {
             app_id: 0,
             app_name_string: "".to_string(),
             build_version_string: "".to_string(),
-            uninstall_action_path: "".to_string(),
-            uninstall_action_args: "".to_string(),
+            uninstall_action_path: None,
+            uninstall_action_args: None,
             launch_exe_string: "".to_string(),
             launch_command: "".to_string(),
             prereq_ids: None,
@@ -390,9 +390,9 @@ impl DownloadManifest {
         }
         if data_version >= 2 {
             res.uninstall_action_path =
-                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+                Some(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
             res.uninstall_action_args =
-                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+                Some(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
         }
 
         debug!("Manifest end position {}", position);
