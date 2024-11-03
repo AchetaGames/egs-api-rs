@@ -1,5 +1,7 @@
 use crate::api::types::account::{AccountData, AccountInfo};
 use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::fab_asset_manifest::DownloadInfo;
+use crate::api::types::fab_library::FabLibrary;
 use crate::api::types::friends::Friend;
 use log::{debug, error, info, warn};
 use reqwest::header::HeaderMap;
@@ -42,6 +44,8 @@ pub enum EpicAPIError {
     InvalidParams,
     /// Server error
     Server,
+    /// FAB Timeout
+    FabTimeout,
 }
 
 impl fmt::Display for EpicAPIError {
@@ -62,6 +66,9 @@ impl fmt::Display for EpicAPIError {
             EpicAPIError::InvalidParams => {
                 write!(f, "Invalid Input Parameters")
             }
+            EpicAPIError::FabTimeout => {
+                write!(f, "Fab Timeout Error")
+            }
         }
     }
 }
@@ -74,6 +81,7 @@ impl Error for EpicAPIError {
             EpicAPIError::Server => "Server Error",
             EpicAPIError::APIError(_) => "API Error",
             EpicAPIError::InvalidParams => "Invalid Input Parameters",
+            EpicAPIError::FabTimeout => "Fab Timeout Error",
         }
     }
 }
@@ -91,13 +99,13 @@ impl EpicAPI {
         let mut headers = HeaderMap::new();
         headers.insert(
             "User-Agent",
-            "UELauncher/UELauncher/14.1.8-21592140+++Portal+Release-Live Windows/10.0.17763.1.0.64bit"
+            "UELauncher/17.0.1-37584233+++Portal+Release-Live Windows/10.0.19043.1.0.64bit"
                 .parse()
                 .unwrap(),
         );
         headers.insert(
             "X-Epic-Correlation-ID",
-            "UE4-615b8f2b4cc88445563fa7a99103eeb7-77F8D1EB4A6CA57DC5797498E13DCAF9-0DCB0C864500976718BB9287AA2DFF4F".parse().unwrap()
+            "UE4-c176f7154c2cda1061cc43ab52598e2b-93AFB486488A22FDF70486BD1D883628-BFCD88F649E997BA203FF69F07CE578C".parse().unwrap()
         );
         reqwest::Client::builder()
             .default_headers(headers)
@@ -386,6 +394,55 @@ impl EpicAPI {
         }
     }
 
+    pub async fn fab_asset_manifest(
+        &self,
+        artifact_id: &str,
+        namespace: &str,
+        asset_id: &str,
+        platform: Option<&str>,
+    ) -> Result<Vec<DownloadInfo>, EpicAPIError> {
+        let url = format!("https://www.fab.com/e/artifacts/{}/manifest", artifact_id);
+        match self
+            .authorized_post_client(Url::parse(&url).unwrap())
+            .json(&serde_json::json!({
+                "item_id": asset_id,
+                "namespace": namespace,
+                "platform": platform.unwrap_or("Windows"),
+            }))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                if response.status() == reqwest::StatusCode::OK {
+                    let text = response.text().await.unwrap();
+                    match serde_json::from_str::<types::fab_asset_manifest::FabAssetManifest>(&text)
+                    {
+                        Ok(manifest) => Ok(manifest.download_info),
+                        Err(e) => {
+                            error!("{:?}", e);
+                            debug!("{}", text);
+                            Err(EpicAPIError::Unknown)
+                        }
+                    }
+                } else if response.status() == reqwest::StatusCode::FORBIDDEN {
+                    Err(EpicAPIError::FabTimeout)
+                } else {
+                    debug!("{:?}", response.headers());
+                    warn!(
+                        "{} result: {}",
+                        response.status(),
+                        response.text().await.unwrap()
+                    );
+                    Err(EpicAPIError::Unknown)
+                }
+            }
+            Err(e) => {
+                error!("{:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
     pub async fn asset_manifest(
         &self,
         platform: Option<String>,
@@ -461,8 +518,7 @@ impl EpicAPI {
                     Ok(response) => {
                         if response.status() == reqwest::StatusCode::OK {
                             match response.bytes().await {
-                                Ok(data) => {
-                                    match DownloadManifest::parse(data.to_vec()) {
+                                Ok(data) => match DownloadManifest::parse(data.to_vec()) {
                                     None => {
                                         error!("Unable to parse the Download Manifest");
                                     }
@@ -515,7 +571,7 @@ impl EpicAPI {
                                         );
                                         result.push(man)
                                     }
-                                }},
+                                },
                                 Err(e) => {
                                     error!("{:?}", e);
                                 }
@@ -689,6 +745,69 @@ impl EpicAPI {
                 Err(EpicAPIError::Unknown)
             }
         }
+    }
+
+    pub async fn fab_library_items(
+        &mut self,
+        account_id: String,
+    ) -> Result<FabLibrary, EpicAPIError> {
+        let mut library = FabLibrary::default();
+
+        loop {
+            let url = match &library.cursors.next {
+                None => {
+                    format!(
+                        "https://www.fab.com/e/accounts/{}/ue/library?count=100",
+                        account_id
+                    )
+                }
+                Some(c) => {
+                    format!(
+                        "https://www.fab.com/e/accounts/{}/ue/library?cursor={}&count=100",
+                        account_id, c
+                    )
+                }
+            };
+
+            match self
+                .authorized_get_client(Url::parse(&url).unwrap())
+                .send()
+                .await
+            {
+                Ok(response) => {
+                    if response.status() == reqwest::StatusCode::OK {
+                        let text = response.text().await.unwrap();
+                        match serde_json::from_str::<FabLibrary>(&text) {
+                            Ok(mut api_library) => {
+                                library.cursors.next = api_library.cursors.next;
+                                library.results.append(api_library.results.borrow_mut());
+                            }
+                            Err(e) => {
+                                error!("{:?}", e);
+                                debug!("{}", text);
+                                library.cursors.next = None;
+                            }
+                        }
+                    } else {
+                        debug!("{:?}", response.headers());
+                        warn!(
+                            "{} result: {}",
+                            response.status(),
+                            response.text().await.unwrap()
+                        );
+                    }
+                }
+                Err(e) => {
+                    error!("{:?}", e);
+                    library.cursors.next = None;
+                }
+            }
+            if library.cursors.next.is_none() {
+                break;
+            }
+        }
+
+        Ok(library)
     }
 
     pub async fn library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
