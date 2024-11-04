@@ -22,13 +22,15 @@ use crate::api::types::account::{AccountData, AccountInfo, UserData};
 use crate::api::types::epic_asset::EpicAsset;
 use crate::api::types::fab_asset_manifest::DownloadInfo;
 use crate::api::types::friends::Friend;
-use crate::api::{EpicAPI, EpicAPIError};
+use crate::api::{EpicAPI};
+
 use api::types::asset_info::{AssetInfo, GameToken};
 use api::types::asset_manifest::AssetManifest;
 use api::types::download_manifest::DownloadManifest;
 use api::types::entitlement::Entitlement;
 use api::types::library::Library;
 use log::{error, info, warn};
+use crate::api::error::EpicAPIError;
 
 /// Module for authenticated API communication
 pub mod api;
@@ -167,7 +169,7 @@ impl EpicGames {
         namespace: &str,
         asset_id: &str,
         platform: Option<&str>,
-    ) -> Result<Vec<api::types::fab_asset_manifest::DownloadInfo>, EpicAPIError> {
+    ) -> Result<Vec<DownloadInfo>, EpicAPIError> {
         match self
             .egs
             .fab_asset_manifest(artifact_id, namespace, asset_id, platform)
