@@ -31,15 +31,11 @@ pub struct DownloadInfo {
 }
 
 impl DownloadInfo {
-
     /// Get Distribution Point by base url
     pub fn get_distribution_point_by_base_url(&self, base_url: &str) -> Option<&DistributionPoint> {
-        for distribution_point in &self.distribution_points {
-            if distribution_point.manifest_url.starts_with(base_url) {
-                return Some(distribution_point);
-            }
-        }
-        None
+        self.distribution_points
+            .iter()
+            .find(|&distribution_point| distribution_point.manifest_url.starts_with(base_url))
     }
 }
 
@@ -49,7 +45,7 @@ impl DownloadInfo {
 pub struct DistributionPoint {
     /// Manifest URL
     pub manifest_url: String,
-    /// Signature expiration 
+    /// Signature expiration
     #[serde(with = "time::serde::rfc3339")]
     pub signature_expiration: time::OffsetDateTime,
 }

@@ -9,7 +9,8 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
-use std::io::{Read, Write};
+use std::fmt::Write;
+use std::io::Read;
 use std::str::FromStr;
 
 #[allow(missing_docs)]
@@ -94,7 +95,10 @@ where
                         res.resize(20, 0);
                     }
 
-                    Ok(res.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+                    Ok(res.iter().fold(String::new(), |mut output, b| {
+                        let _ = write!(output, "{b:02x}");
+                        output
+                    }))
                 }
                 Err(_) => Err(de::Error::custom("Could not parse Epic Blob")),
             }
@@ -152,7 +156,7 @@ impl DownloadManifest {
             self.custom_fields = Some([(key, value)].iter().cloned().collect())
         };
     }
-    
+
     /// Get custom field value
     pub fn custom_field(&self, key: &str) -> Option<String> {
         match &self.custom_fields {
@@ -210,10 +214,7 @@ impl DownloadManifest {
     /// Get list of files in the manifest
     pub fn files(&self) -> HashMap<String, FileManifestList> {
         let mut result: HashMap<String, FileManifestList> = HashMap::new();
-        let links = match self.download_links() {
-            None => HashMap::new(),
-            Some(l) => l,
-        };
+        let links = self.download_links().unwrap_or_default();
 
         for file in self.file_manifest_list.clone() {
             result.insert(
@@ -266,14 +267,18 @@ impl DownloadManifest {
     pub fn parse(data: Vec<u8>) -> Option<DownloadManifest> {
         debug!("Attempting to parse download manifest from binary data");
         // debug!("attempted json {:?}", serde_json::from_slice::<DownloadManifest>(data.as_slice()));
-        let hash =  Sha1::digest(&data);
+        let hash = Sha1::digest(&data);
         match DownloadManifest::from_vec(data.clone()) {
             None => {
                 debug!("Not binary manifest trying json");
                 match serde_json::from_slice::<DownloadManifest>(data.as_slice()) {
                     Ok(mut dm) => {
-                        dm.set_custom_field("DownloadedManifestHash".to_string(), format!("{:x}", hash));
-                        Some(dm)},
+                        dm.set_custom_field(
+                            "DownloadedManifestHash".to_string(),
+                            format!("{:x}", hash),
+                        );
+                        Some(dm)
+                    }
                     Err(_) => None,
                 }
             }
@@ -447,7 +452,7 @@ impl DownloadManifest {
         debug!("Reading Chunk Sha Hashes");
         for chunk in chunks.iter_mut() {
             position += 20;
-            chunk.sha_hash = buffer[position - 20..position].try_into().unwrap();
+            chunk.sha_hash = buffer[position - 20..position].into();
         }
 
         debug!("Reading Chunk group nums");
@@ -466,11 +471,10 @@ impl DownloadManifest {
         for chunk in chunks {
             chunk_sha_list.insert(
                 chunk.guid.clone(),
-                chunk
-                    .sha_hash
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>(),
+                chunk.sha_hash.iter().fold(String::new(), |mut output, b| {
+                    let _ = write!(output, "{b:02x}");
+                    output
+                }),
             );
             res.chunk_hash_list.insert(chunk.guid.clone(), chunk.hash);
             res.chunk_filesize_list.insert(
@@ -479,7 +483,7 @@ impl DownloadManifest {
             );
             res.data_group_list.insert(
                 chunk.guid,
-                u128::try_from(chunk.group_num).unwrap_or_default(),
+                chunk.group_num.into(),
             );
         }
         res.chunk_sha_list = Some(chunk_sha_list);
@@ -523,7 +527,7 @@ impl DownloadManifest {
 
         for file in files.iter_mut() {
             position += 20;
-            file.hash = buffer[position - 20..position].try_into().unwrap();
+            file.hash = buffer[position - 20..position].into();
         }
 
         for file in files.iter_mut() {
@@ -574,20 +578,21 @@ impl DownloadManifest {
         if fm_version >= 1 {
             for file in files.iter_mut() {
                 let has_md5 = crate::api::utils::read_le(&buffer, &mut position);
-                if has_md5!= 0 {
+                if has_md5 != 0 {
                     position += 16;
-                    file.hash_md5 = buffer[position - 16..position].try_into().unwrap();
+                    file.hash_md5 = buffer[position - 16..position].into();
                 }
             }
             for file in files.iter_mut() {
-                file.mime_type = crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
+                file.mime_type =
+                    crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
             }
         }
 
         if fm_version >= 2 {
             for file in files.iter_mut() {
                 position += 32;
-                file.hash_sha256 = buffer[position - 32..position].try_into().unwrap();
+                file.hash_sha256 = buffer[position - 32..position].into();
             }
         }
 
@@ -601,17 +606,16 @@ impl DownloadManifest {
                 chunks.push(FileChunkPart {
                     guid: chunk.guid.clone(),
                     link: None,
-                    offset: chunk.offset as u128,
-                    size: chunk.size as u128,
+                    offset: chunk.offset,
+                    size: chunk.size,
                 })
             }
             res.file_manifest_list.push(FileManifestList {
                 filename: file.filename.clone(),
-                file_hash: file
-                    .hash
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>(),
+                file_hash: file.hash.iter().fold(String::new(), |mut output, b| {
+                    let _ = write!(output, "{b:02x}");
+                    output
+                }),
                 file_chunk_parts: chunks,
             })
         }
@@ -968,7 +972,7 @@ impl DownloadManifest {
         result.append((data.len() as u32).to_le_bytes().to_vec().borrow_mut());
         // Size compressed
         let mut z = ZlibEncoder::new(Vec::new(), Compression::default());
-        z.write_all(&data).unwrap();
+        std::io::Write::write_all(&mut z, &data).unwrap();
         let mut compressed = z.finish().unwrap();
         result.append(
             (compressed.len() as u32)

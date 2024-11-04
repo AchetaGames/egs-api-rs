@@ -1,6 +1,5 @@
 use flate2::read::ZlibDecoder;
 use log::{debug, error};
-use std::convert::TryInto;
 use std::io::Read;
 
 /// Struct holding data for downloaded chunks
@@ -55,7 +54,7 @@ impl Chunk {
 
         if res.header_version >= 2 {
             position += 20;
-            res.sha_hash = Some(buffer[position - 20..position].try_into().unwrap());
+            res.sha_hash = Some(buffer[position - 20..position].into());
             res.hash_type = Some(buffer[position]);
             position += 1;
         }
