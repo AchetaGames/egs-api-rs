@@ -152,8 +152,9 @@ impl DownloadManifest {
             self.custom_fields = Some([(key, value)].iter().cloned().collect())
         };
     }
-
-    pub(crate) fn custom_field(&self, key: &str) -> Option<String> {
+    
+    /// Get custom field value
+    pub fn custom_field(&self, key: &str) -> Option<String> {
         match &self.custom_fields {
             Some(fields) => fields.get(key).cloned(),
             None => None,
@@ -264,17 +265,21 @@ impl DownloadManifest {
     /// Parse DownloadManifest from binary data or Json
     pub fn parse(data: Vec<u8>) -> Option<DownloadManifest> {
         debug!("Attempting to parse download manifest from binary data");
-        debug!("attempted json {:?}", serde_json::from_slice::<DownloadManifest>(data.as_slice()));
+        // debug!("attempted json {:?}", serde_json::from_slice::<DownloadManifest>(data.as_slice()));
+        let hash =  Sha1::digest(&data);
         match DownloadManifest::from_vec(data.clone()) {
             None => {
                 debug!("Not binary manifest trying json");
                 match serde_json::from_slice::<DownloadManifest>(data.as_slice()) {
-                    Ok(dm) => Some(dm),
+                    Ok(mut dm) => {
+                        dm.set_custom_field("DownloadedManifestHash".to_string(), format!("{:x}", hash));
+                        Some(dm)},
                     Err(_) => None,
                 }
             }
-            Some(dm) => {
+            Some(mut dm) => {
                 debug!("Binary parsing successful");
+                dm.set_custom_field("DownloadedManifestHash".to_string(), format!("{:x}", hash));
                 Some(dm)
             }
         }

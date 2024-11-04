@@ -499,6 +499,55 @@ impl EpicAPI {
         }
     }
 
+    pub async fn fab_download_manifest(
+        &self,
+        download_info: DownloadInfo,
+        distribution_point_url: &str,
+    ) -> Result<DownloadManifest, EpicAPIError> {
+        match download_info.get_distribution_point_by_base_url(distribution_point_url) {
+            None => {
+                error!("Distribution point not found");
+                Err(EpicAPIError::Unknown)
+            }
+            Some(point) => {
+                if point.signature_expiration < time::OffsetDateTime::now_utc() {
+                    error!("Expired signature");
+                    Err(EpicAPIError::Unknown)
+                } else {
+                    let client = EpicAPI::build_client().build().unwrap();
+                    match client
+                        .get(Url::from_str(&point.manifest_url).unwrap())
+                        .send()
+                        .await
+                    {
+                        Ok(response) => {
+                            if response.status() == reqwest::StatusCode::OK {
+                                match response.bytes().await {
+                                    Ok(data) => match DownloadManifest::parse(data.to_vec()) {
+                                        None => {
+                                            error!("Unable to parse the Download Manifest");
+                                            Err(EpicAPIError::Unknown)
+                                        }
+                                        Some(man) => Ok(man),
+                                    },
+                                    Err(_) => Err(EpicAPIError::Unknown),
+                                }
+                            } else {
+                                warn!(
+                                    "{} result: {}",
+                                    response.status(),
+                                    response.text().await.unwrap()
+                                );
+                                Err(EpicAPIError::Unknown)
+                            }
+                        }
+                        Err(_) => Err(EpicAPIError::Unknown),
+                    }
+                }
+            }
+        }
+    }
+
     pub async fn asset_download_manifests(
         &self,
         asset_manifest: AssetManifest,

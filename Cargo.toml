@@ -24,6 +24,7 @@ num = "0.4"
 reqwest_cookie_store = "0.8.0"
 cookie_store = "0.21.0"
 uuid = { version = "1", features = ["v4", "serde"] }
+time = { version = "^0.3", features = ["serde", "parsing", "serde-well-known"] }
 
 [dependencies.tokio]
 version = "1"
