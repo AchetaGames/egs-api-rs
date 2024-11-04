@@ -20,6 +20,7 @@
 
 use crate::api::types::account::{AccountData, AccountInfo, UserData};
 use crate::api::types::epic_asset::EpicAsset;
+use crate::api::types::fab_asset_manifest::DownloadInfo;
 use crate::api::types::friends::Friend;
 use crate::api::{EpicAPI, EpicAPIError};
 use api::types::asset_info::{AssetInfo, GameToken};
@@ -134,10 +135,10 @@ impl EpicGames {
         platform: Option<String>,
         label: Option<String>,
     ) -> Vec<EpicAsset> {
-        match self.egs.assets(platform, label).await {
-            Ok(b) => b,
-            Err(_) => Vec::new(),
-        }
+        self.egs
+            .assets(platform, label)
+            .await
+            .unwrap_or_else(|_| Vec::new())
     }
 
     /// Return asset
@@ -255,5 +256,16 @@ impl EpicGames {
     /// Returns a DownloadManifest for a specified file manifest
     pub async fn asset_download_manifests(&self, manifest: AssetManifest) -> Vec<DownloadManifest> {
         self.egs.asset_download_manifests(manifest).await
+    }
+
+    /// Return a Download Manifest for specified FAB download and url
+    pub async fn fab_download_manifest(
+        &self,
+        download_info: DownloadInfo,
+        distribution_point_url: &str,
+    ) -> Result<DownloadManifest, EpicAPIError> {
+        self.egs
+            .fab_download_manifest(download_info, distribution_point_url)
+            .await
     }
 }
