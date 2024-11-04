@@ -67,7 +67,6 @@ pub(crate) fn read_fstring(buffer: &[u8], position: &mut usize) -> Option<String
             Some(String::from_utf16_lossy(
                 buffer[*position - length as usize..*position - 2]
                     .chunks_exact(2)
-                    .into_iter()
                     .map(|a| u16::from_ne_bytes([a[0], a[1]]))
                     .collect::<Vec<u16>>()
                     .as_slice(),

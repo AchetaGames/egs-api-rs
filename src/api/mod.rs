@@ -50,7 +50,7 @@ pub enum EpicAPIError {
 
 impl fmt::Display for EpicAPIError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &*self {
+        match self {
             EpicAPIError::InvalidCredentials => {
                 write!(f, "Invalid Credentials")
             }
@@ -211,7 +211,7 @@ impl EpicAPI {
     pub async fn resume_session(&mut self) -> Result<bool, EpicAPIError> {
         match self.authorized_get_client(Url::parse("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify").unwrap()).send().await {
             Ok(response) => {
-                return self.handle_login_response(response).await;
+                self.handle_login_response(response).await
             }
             Err(e) => {
                 error!("{:?}", e);

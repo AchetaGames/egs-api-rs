@@ -228,10 +228,7 @@ impl EpicGames {
 
     ///Returns user entitlements
     pub async fn user_entitlements(&mut self) -> Vec<Entitlement> {
-        match self.egs.user_entitlements().await {
-            Ok(a) => a,
-            Err(_) => Vec::new(),
-        }
+        self.egs.user_entitlements().await.unwrap_or_else(|_| Vec::new())
     }
 
     /// Returns the user library
