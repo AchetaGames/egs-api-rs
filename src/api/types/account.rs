@@ -175,7 +175,7 @@ pub struct ExternalAuth {
     pub date_added: Option<String>,
     pub avatar: Option<String>,
     pub external_auth_id: Option<String>,
-    pub external_auth_id_type: String,
+    pub external_auth_id_type: Option<String>,
     pub external_display_name: String,
     #[serde(rename = "type")]
     pub type_field: String,

@@ -24,3 +24,9 @@ pub mod account;
 
 /// Friends structures
 pub mod friends;
+
+/// Fab Library Structures
+pub mod fab_library;
+
+/// Fab Asset Manifest
+pub mod fab_asset_manifest;

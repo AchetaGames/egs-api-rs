@@ -21,7 +21,7 @@
 use crate::api::types::account::{AccountData, AccountInfo, UserData};
 use crate::api::types::epic_asset::EpicAsset;
 use crate::api::types::friends::Friend;
-use crate::api::EpicAPI;
+use crate::api::{EpicAPI, EpicAPIError};
 use api::types::asset_info::{AssetInfo, GameToken};
 use api::types::asset_manifest::AssetManifest;
 use api::types::download_manifest::DownloadManifest;
@@ -159,6 +159,24 @@ impl EpicGames {
         }
     }
 
+    /// Return Fab Asset Manifest
+    pub async fn fab_asset_manifest(
+        &self,
+        artifact_id: &str,
+        namespace: &str,
+        asset_id: &str,
+        platform: Option<&str>,
+    ) -> Result<Vec<api::types::fab_asset_manifest::DownloadInfo>, EpicAPIError> {
+        match self
+            .egs
+            .fab_asset_manifest(artifact_id, namespace, asset_id, platform)
+            .await
+        {
+            Ok(a) => Ok(a),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Returns info for an asset
     pub async fn asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
         match self.egs.asset_info(asset.clone()).await {
@@ -218,6 +236,17 @@ impl EpicGames {
     /// Returns the user library
     pub async fn library_items(&mut self, include_metadata: bool) -> Option<Library> {
         match self.egs.library_items(include_metadata).await {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        }
+    }
+
+    /// Returns the user FAB library
+    pub async fn fab_library_items(
+        &mut self,
+        account_id: String,
+    ) -> Option<api::types::fab_library::FabLibrary> {
+        match self.egs.fab_library_items(account_id).await {
             Ok(a) => Some(a),
             Err(_) => None,
         }

@@ -1,5 +1,8 @@
 use egs_api::EpicGames;
 use std::io::{self};
+use std::time::Duration;
+use tokio::time::sleep;
+use egs_api::api::EpicAPIError;
 
 #[tokio::main]
 async fn main() {
@@ -27,8 +30,62 @@ async fn main() {
         .account_ids_details(vec![egs.user_details().account_id.unwrap_or_default()])
         .await;
     println!("Account info: {:?}", info);
-    let friends = egs.account_friends(true).await;
-    println!("Friends: {:?}", friends);
+    // let friends = egs.account_friends(true).await;
+    // println!("Friends: {:?}", friends);
+    match details {
+        None => {}
+        Some(info) => {
+            let assets = egs.fab_library_items(info.id).await;
+            match assets {
+                None => {
+                    println!("No assets found");
+                }
+                Some(ass) => {
+                    println!("Library items: {:?}", ass.results.len());
+                    for asset in ass.results.iter() {
+                        for version in asset.project_versions.iter() {
+                            loop {
+                                let manifest = egs.fab_asset_manifest(
+                                    &version.artifact_id,
+                                    &asset.asset_namespace,
+                                    &asset.asset_id,
+                                    None,
+                                ).await;
+                                match manifest {
+                                    Ok(manifest) => {
+                                        println!("OK Manifest for {} - {}", asset.title, version.artifact_id);
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        match e {
+                                            EpicAPIError::FabTimeout => {
+                                                sleep(Duration::from_millis(1000)).await;
+                                                continue;
+                                            }
+                                            _ => {}
+                                        }
+                                        println!("NO Manifest for {} - {}", asset.title, version.artifact_id);
+                                        break;
+                                    }
+                                }
+                            }
+                            sleep(Duration::from_millis(1000)).await;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let manifest = egs
+        .fab_asset_manifest(
+            "KiteDemo473",
+            "89efe5924d3d467c839449ab6ab52e7f",
+            "28166226c38a4ff3aa28bbe87dcbbe5b",
+            None,
+        )
+        .await;
+    println!("Kite Demo Manifest: {:?}", manifest);
 
     // let code = egs.game_token().await;
     // if let Some(c) = code {
