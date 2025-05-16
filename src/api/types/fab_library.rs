@@ -9,7 +9,7 @@ pub struct FabLibrary {
     /// Pagination cursors
     pub cursors: Cursor,
     /// Library contents
-    pub results: Vec<Result>,
+    pub results: Vec<FabAsset>,
 }
 
 /// Pagination Cursors
@@ -24,7 +24,7 @@ pub struct Cursor {
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Result {
+pub struct FabAsset {
     /// Asset ID
     pub asset_id: String,
     /// Asset Namespace
