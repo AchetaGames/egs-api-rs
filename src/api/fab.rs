@@ -5,10 +5,10 @@ use crate::api::types::fab_library::FabLibrary;
 use crate::api::EpicAPI;
 use log::{debug, error, warn};
 use std::borrow::BorrowMut;
-use std::str::FromStr;
 use url::Url;
 
 impl EpicAPI {
+    /// Fetch Fab asset manifest with signed distribution points. Returns `FabTimeout` on 403.
     pub async fn fab_asset_manifest(
         &self,
         artifact_id: &str,
@@ -17,8 +17,9 @@ impl EpicAPI {
         platform: Option<&str>,
     ) -> Result<Vec<DownloadInfo>, EpicAPIError> {
         let url = format!("https://www.fab.com/e/artifacts/{}/manifest", artifact_id);
+        let parsed_url = Url::parse(&url).map_err(|_| EpicAPIError::InvalidParams)?;
         match self
-            .authorized_post_client(Url::parse(&url).unwrap())
+            .authorized_post_client(parsed_url)
             .json(&serde_json::json!({
                 "item_id": asset_id,
                 "namespace": namespace,
@@ -29,7 +30,7 @@ impl EpicAPI {
         {
             Ok(response) => {
                 if response.status() == reqwest::StatusCode::OK {
-                    let text = response.text().await.unwrap();
+                    let text = response.text().await.unwrap_or_default();
                     match serde_json::from_str::<
                         crate::api::types::fab_asset_manifest::FabAssetManifest,
                     >(&text)
@@ -48,7 +49,7 @@ impl EpicAPI {
                     warn!(
                         "{} result: {}",
                         response.status(),
-                        response.text().await.unwrap()
+                        response.text().await.unwrap_or_default()
                     );
                     Err(EpicAPIError::Unknown)
                 }
@@ -60,6 +61,7 @@ impl EpicAPI {
         }
     }
 
+    /// Download and parse a Fab manifest from a distribution point.
     pub async fn fab_download_manifest(
         &self,
         download_info: DownloadInfo,
@@ -75,40 +77,20 @@ impl EpicAPI {
                     error!("Expired signature");
                     Err(EpicAPIError::Unknown)
                 } else {
-                    let client = EpicAPI::build_client().build().unwrap();
-                    match client
-                        .get(Url::from_str(&point.manifest_url).unwrap())
-                        .send()
-                        .await
-                    {
-                        Ok(response) => {
-                            if response.status() == reqwest::StatusCode::OK {
-                                match response.bytes().await {
-                                    Ok(data) => match DownloadManifest::parse(data.to_vec()) {
-                                        None => {
-                                            error!("Unable to parse the Download Manifest");
-                                            Err(EpicAPIError::Unknown)
-                                        }
-                                        Some(man) => Ok(man),
-                                    },
-                                    Err(_) => Err(EpicAPIError::Unknown),
-                                }
-                            } else {
-                                warn!(
-                                    "{} result: {}",
-                                    response.status(),
-                                    response.text().await.unwrap()
-                                );
-                                Err(EpicAPIError::Unknown)
-                            }
+                    let data = self.get_bytes(&point.manifest_url).await?;
+                    match DownloadManifest::parse(data) {
+                        None => {
+                            error!("Unable to parse the Download Manifest");
+                            Err(EpicAPIError::Unknown)
                         }
-                        Err(_) => Err(EpicAPIError::Unknown),
+                        Some(man) => Ok(man),
                     }
                 }
             }
         }
     }
 
+    /// Fetch all Fab library items, paginating internally.
     pub async fn fab_library_items(
         &mut self,
         account_id: String,
@@ -131,33 +113,10 @@ impl EpicAPI {
                 }
             };
 
-            match self
-                .authorized_get_client(Url::parse(&url).unwrap())
-                .send()
-                .await
-            {
-                Ok(response) => {
-                    if response.status() == reqwest::StatusCode::OK {
-                        let text = response.text().await.unwrap();
-                        match serde_json::from_str::<FabLibrary>(&text) {
-                            Ok(mut api_library) => {
-                                library.cursors.next = api_library.cursors.next;
-                                library.results.append(api_library.results.borrow_mut());
-                            }
-                            Err(e) => {
-                                error!("{:?}", e);
-                                debug!("{}", text);
-                                library.cursors.next = None;
-                            }
-                        }
-                    } else {
-                        debug!("{:?}", response.headers());
-                        warn!(
-                            "{} result: {}",
-                            response.status(),
-                            response.text().await.unwrap()
-                        );
-                    }
+            match self.authorized_get_json::<FabLibrary>(&url).await {
+                Ok(mut api_library) => {
+                    library.cursors.next = api_library.cursors.next;
+                    library.results.append(api_library.results.borrow_mut());
                 }
                 Err(e) => {
                     error!("{:?}", e);
@@ -170,5 +129,19 @@ impl EpicAPI {
         }
 
         Ok(library)
+    }
+
+    /// Fetch download info for a specific file within a Fab listing.
+    pub async fn fab_file_download_info(
+        &self,
+        listing_id: &str,
+        format_id: &str,
+        file_id: &str,
+    ) -> Result<DownloadInfo, EpicAPIError> {
+        let url = format!(
+            "https://www.fab.com/p/egl/listings/{}/asset-formats/{}/files/{}/download-info",
+            listing_id, format_id, file_id
+        );
+        self.authorized_get_json(&url).await
     }
 }

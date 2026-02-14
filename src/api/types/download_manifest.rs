@@ -319,7 +319,7 @@ impl DownloadManifest {
         // Reading Header
         let magic = crate::api::utils::read_le(&buffer, &mut position);
         if magic != 1153351692 {
-            error!("No header magic");
+            debug!("No header magic, not a binary manifest");
             return None;
         }
         let mut header_size = crate::api::utils::read_le(&buffer, &mut position);
@@ -327,7 +327,13 @@ impl DownloadManifest {
         let _size_uncompressed = crate::api::utils::read_le(&buffer, &mut position);
         let _size_compressed = crate::api::utils::read_le(&buffer, &mut position);
         position += 20;
-        let sha_hash: [u8; 20] = buffer[position - 20..position].try_into().unwrap();
+        let sha_hash: [u8; 20] = match buffer[position - 20..position].try_into() {
+            Ok(h) => h,
+            Err(_) => {
+                error!("Buffer too short for SHA hash");
+                return None;
+            }
+        };
         let compressed = !matches!(buffer[position], 0);
         position += 1;
         let _version = crate::api::utils::read_le(&buffer, &mut position);
@@ -336,7 +342,10 @@ impl DownloadManifest {
             debug!("Uncompressing");
             let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
-            z.read_to_end(&mut data).unwrap();
+            if z.read_to_end(&mut data).is_err() {
+                error!("Failed to decompress manifest data");
+                return None;
+            }
             if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data)) {
                 error!("The extracted hash does not match");
                 return None;
@@ -481,10 +490,8 @@ impl DownloadManifest {
                 chunk.guid.clone(),
                 u128::try_from(chunk.file_size).unwrap_or_default(),
             );
-            res.data_group_list.insert(
-                chunk.guid,
-                chunk.group_num.into(),
-            );
+            res.data_group_list
+                .insert(chunk.guid, chunk.group_num.into());
         }
         res.chunk_sha_list = Some(chunk_sha_list);
 
@@ -787,7 +794,12 @@ impl DownloadManifest {
             }
         }
 
-        for sha in self.chunk_sha_list.as_ref().unwrap().values() {
+        for sha in self
+            .chunk_sha_list
+            .as_ref()
+            .unwrap_or(&HashMap::new())
+            .values()
+        {
             match crate::api::utils::decode_hex(sha.as_str()) {
                 Ok(mut s) => chunks.append(s.borrow_mut()),
                 Err(_) => chunks.append(vec![0u8; 20].borrow_mut()),
@@ -869,7 +881,9 @@ impl DownloadManifest {
 
         // flags
         // TODO: Figure out what Epic puts in theirs
-        files.resize(self.file_manifest_list.len(), 0);
+        for _ in &self.file_manifest_list {
+            files.push(0u8);
+        }
 
         // install tags
         // TODO: Figure out what Epic puts in theirs
@@ -1056,4 +1070,173 @@ struct BinaryChunkInfo {
     group_num: u8,
     window_size: u32,
     file_size: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn chunk_dir_versions() {
+        assert_eq!(DownloadManifest::chunk_dir(0), "Chunks");
+        assert_eq!(DownloadManifest::chunk_dir(3), "ChunksV2");
+        assert_eq!(DownloadManifest::chunk_dir(6), "ChunksV3");
+        assert_eq!(DownloadManifest::chunk_dir(15), "ChunksV4");
+        assert_eq!(DownloadManifest::chunk_dir(20), "ChunksV4");
+    }
+
+    #[test]
+    fn custom_field_get_set() {
+        let mut manifest = DownloadManifest::default();
+        assert_eq!(manifest.custom_field("foo"), None);
+        manifest.set_custom_field("foo".to_string(), "bar".to_string());
+        assert_eq!(manifest.custom_field("foo"), Some("bar".to_string()));
+
+        let mut populated = DownloadManifest {
+            custom_fields: Some(HashMap::from([("alpha".to_string(), "beta".to_string())])),
+            ..DownloadManifest::default()
+        };
+        populated.set_custom_field("gamma".to_string(), "delta".to_string());
+        assert_eq!(populated.custom_field("alpha"), Some("beta".to_string()));
+        assert_eq!(populated.custom_field("gamma"), Some("delta".to_string()));
+    }
+
+    #[test]
+    fn total_download_size_empty() {
+        let manifest = DownloadManifest::default();
+        assert_eq!(manifest.total_download_size(), 0);
+    }
+
+    #[test]
+    fn total_download_size_with_data() {
+        let manifest = DownloadManifest {
+            chunk_filesize_list: HashMap::from([
+                ("a".to_string(), 100u128),
+                ("b".to_string(), 200u128),
+                ("c".to_string(), 300u128),
+            ]),
+            ..DownloadManifest::default()
+        };
+        assert_eq!(manifest.total_download_size(), 600);
+    }
+
+    #[test]
+    fn total_size_from_file_parts() {
+        let manifest = DownloadManifest {
+            file_manifest_list: vec![FileManifestList {
+                filename: "one.dat".to_string(),
+                file_hash: "0000000000000000000000000000000000000000".to_string(),
+                file_chunk_parts: vec![
+                    FileChunkPart {
+                        guid: "guid1".to_string(),
+                        link: None,
+                        offset: 0,
+                        size: 10,
+                    },
+                    FileChunkPart {
+                        guid: "guid2".to_string(),
+                        link: None,
+                        offset: 10,
+                        size: 20,
+                    },
+                ],
+            }],
+            ..DownloadManifest::default()
+        };
+        assert_eq!(manifest.total_size(), 30);
+    }
+
+    #[test]
+    fn file_manifest_list_size() {
+        let file = FileManifestList {
+            filename: "test.dat".to_string(),
+            file_hash: "0000000000000000000000000000000000000000".to_string(),
+            file_chunk_parts: vec![
+                FileChunkPart {
+                    guid: "a".to_string(),
+                    link: None,
+                    offset: 0,
+                    size: 100,
+                },
+                FileChunkPart {
+                    guid: "b".to_string(),
+                    link: None,
+                    offset: 100,
+                    size: 200,
+                },
+                FileChunkPart {
+                    guid: "c".to_string(),
+                    link: None,
+                    offset: 300,
+                    size: 300,
+                },
+            ],
+        };
+        assert_eq!(file.size(), 600);
+    }
+
+    #[test]
+    fn binary_roundtrip() {
+        let guid = "00000001000000020000000300000004".to_string();
+        let file_hash = "0000000000000000000000000000000000000000".to_string();
+        let manifest = DownloadManifest {
+            manifest_file_version: 18,
+            app_name_string: "TestApp".to_string(),
+            build_version_string: "1.0.0".to_string(),
+            file_manifest_list: vec![FileManifestList {
+                filename: "test.dat".to_string(),
+                file_hash: file_hash.clone(),
+                file_chunk_parts: vec![FileChunkPart {
+                    guid: guid.clone(),
+                    link: None,
+                    offset: 0,
+                    size: 65536,
+                }],
+            }],
+            chunk_hash_list: HashMap::from([(guid.clone(), 12345u128)]),
+            chunk_sha_list: Some(HashMap::from([(
+                guid.clone(),
+                "0000000000000000000000000000000000000000".to_string(),
+            )])),
+            data_group_list: HashMap::from([(guid.clone(), 1u128)]),
+            chunk_filesize_list: HashMap::from([(guid.clone(), 65536u128)]),
+            custom_fields: Some(HashMap::new()),
+            ..DownloadManifest::default()
+        };
+
+        let roundtrip = DownloadManifest::from_vec(manifest.to_vec()).unwrap();
+        assert_eq!(roundtrip.app_name_string, "TestApp");
+        assert_eq!(roundtrip.build_version_string, "1.0.0");
+        assert_eq!(roundtrip.manifest_file_version, 18);
+        assert_eq!(roundtrip.chunk_hash_list.len(), 1);
+        assert_eq!(roundtrip.file_manifest_list.len(), 1);
+        assert_eq!(roundtrip.file_manifest_list[0].filename, "test.dat");
+    }
+
+    #[test]
+    fn parse_invalid_data() {
+        assert_eq!(DownloadManifest::parse(vec![0, 1, 2, 3]), None);
+    }
+
+    #[test]
+    fn parse_invalid_json() {
+        assert_eq!(DownloadManifest::parse(b"not json".to_vec()), None);
+    }
+
+    #[test]
+    fn from_vec_no_magic() {
+        assert_eq!(
+            DownloadManifest::from_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+            None
+        );
+    }
+
+    #[test]
+    fn from_vec_too_short() {
+        assert_eq!(
+            DownloadManifest::from_vec(vec![0x4C, 0xB4, 0xCB, 0x44]),
+            None
+        );
+    }
 }

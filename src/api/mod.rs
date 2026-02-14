@@ -1,7 +1,11 @@
+use log::{error, warn};
 use reqwest::header::HeaderMap;
-use reqwest::{Client, ClientBuilder, RequestBuilder};
+use reqwest::{Client, RequestBuilder};
+use serde::de::DeserializeOwned;
 use types::account::UserData;
 use url::Url;
+
+use crate::api::error::EpicAPIError;
 
 /// Module holding the API types
 pub mod types;
@@ -23,22 +27,29 @@ pub mod egs;
 /// Session Handling
 pub mod login;
 
-#[derive(Default, Debug, Clone)]
+/// Commerce Methods (pricing, purchases, billing)
+pub mod commerce;
+
+/// Service Status Methods
+pub mod status;
+
+/// Presence Methods
+pub mod presence;
+
+#[derive(Debug, Clone)]
 pub(crate) struct EpicAPI {
     client: Client,
     pub(crate) user_data: UserData,
 }
 
+impl Default for EpicAPI {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EpicAPI {
     pub fn new() -> Self {
-        let client = EpicAPI::build_client().build().unwrap();
-        EpicAPI {
-            client,
-            user_data: Default::default(),
-        }
-    }
-
-    fn build_client() -> ClientBuilder {
         let mut headers = HeaderMap::new();
         headers.insert(
             "User-Agent",
@@ -50,19 +61,23 @@ impl EpicAPI {
             "X-Epic-Correlation-ID",
             "UE4-c176f7154c2cda1061cc43ab52598e2b-93AFB486488A22FDF70486BD1D883628-BFCD88F649E997BA203FF69F07CE578C".parse().unwrap()
         );
-        reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .default_headers(headers)
             .cookie_store(true)
+            .build()
+            .unwrap();
+        EpicAPI {
+            client,
+            user_data: Default::default(),
+        }
     }
 
     fn authorized_get_client(&self, url: Url) -> RequestBuilder {
-        let client = EpicAPI::build_client().build().unwrap();
-        self.set_authorization_header(client.get(url))
+        self.set_authorization_header(self.client.get(url))
     }
 
     fn authorized_post_client(&self, url: Url) -> RequestBuilder {
-        let client = EpicAPI::build_client().build().unwrap();
-        self.set_authorization_header(client.post(url))
+        self.set_authorization_header(self.client.post(url))
     }
 
     fn set_authorization_header(&self, rb: RequestBuilder) -> RequestBuilder {
@@ -82,5 +97,121 @@ impl EpicAPI {
         )
     }
 
-    
+    /// Send an authorized GET request and deserialize the JSON response
+    pub(crate) async fn authorized_get_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+    ) -> Result<T, EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .authorized_get_client(parsed_url)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })?;
+        if response.status() == reqwest::StatusCode::OK {
+            response.json::<T>().await.map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })
+        } else {
+            warn!(
+                "{} result: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            );
+            Err(EpicAPIError::Unknown)
+        }
+    }
+
+    /// Send an authorized POST request with form data and deserialize the JSON response
+    pub(crate) async fn authorized_post_form_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        form: &[(String, String)],
+    ) -> Result<T, EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .authorized_post_client(parsed_url)
+            .form(form)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })?;
+        if response.status() == reqwest::StatusCode::OK {
+            response.json::<T>().await.map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })
+        } else {
+            warn!(
+                "{} result: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            );
+            Err(EpicAPIError::Unknown)
+        }
+    }
+
+    /// Send an authorized POST request with a JSON body and deserialize the JSON response
+    pub(crate) async fn authorized_post_json<T: DeserializeOwned, B: serde::Serialize>(
+        &self,
+        url: &str,
+        body: &B,
+    ) -> Result<T, EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .authorized_post_client(parsed_url)
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })?;
+        if response.status() == reqwest::StatusCode::OK {
+            response.json::<T>().await.map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })
+        } else {
+            warn!(
+                "{} result: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            );
+            Err(EpicAPIError::Unknown)
+        }
+    }
+
+    /// Send an unauthenticated GET request and return the raw bytes
+    pub(crate) async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .client
+            .get(parsed_url)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })?;
+        if response.status() == reqwest::StatusCode::OK {
+            response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::Unknown
+            })
+        } else {
+            warn!(
+                "{} result: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            );
+            Err(EpicAPIError::Unknown)
+        }
+    }
 }

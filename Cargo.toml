@@ -10,6 +10,7 @@ readme = "README.md"
 repository = "https://github.com/AchetaGames/egs-api-rs"
 documentation = "https://docs.rs/egs-api/latest/egs_api/"
 edition = "2018"
+autoexamples = false
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json", "cookies", "blocking"] }
@@ -37,3 +38,55 @@ features = ["derive"]
 [dev-dependencies]
 webbrowser = "1"
 env_logger = "0.11"
+
+[[example]]
+name = "workflow"
+path = "examples/workflow.rs"
+
+[[example]]
+name = "auth"
+path = "examples/auth.rs"
+
+[[example]]
+name = "account"
+path = "examples/account.rs"
+
+[[example]]
+name = "entitlements"
+path = "examples/entitlements.rs"
+
+[[example]]
+name = "library"
+path = "examples/library.rs"
+
+[[example]]
+name = "assets"
+path = "examples/assets.rs"
+
+[[example]]
+name = "game_token"
+path = "examples/game_token.rs"
+
+[[example]]
+name = "fab"
+path = "examples/fab.rs"
+
+[[example]]
+name = "catalog"
+path = "examples/catalog.rs"
+
+[[example]]
+name = "commerce"
+path = "examples/commerce.rs"
+
+[[example]]
+name = "status"
+path = "examples/status.rs"
+
+[[example]]
+name = "presence"
+path = "examples/presence.rs"
+
+[[example]]
+name = "client_credentials"
+path = "examples/client_credentials.rs"

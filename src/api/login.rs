@@ -1,12 +1,11 @@
-use std::str::FromStr;
 use log::{error, info, warn};
 use reqwest::Response;
-use url::Url;
 use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::account::UserData;
 
 impl EpicAPI {
+    /// Start a new OAuth session with exchange token, authorization code, or refresh token.
     pub async fn start_session(
         &mut self,
         exchange_token: Option<String>,
@@ -54,6 +53,7 @@ impl EpicAPI {
         }
     }
 
+    /// Handle the OAuth login response and update user data.
     async fn handle_login_response(&mut self, response: Response) -> Result<bool, EpicAPIError> {
         if response.status() == reqwest::StatusCode::INTERNAL_SERVER_ERROR {
             error!("Server Error");
@@ -76,8 +76,12 @@ impl EpicAPI {
         Ok(true)
     }
 
+    /// Resume an existing session by verifying the access token.
     pub async fn resume_session(&mut self) -> Result<bool, EpicAPIError> {
-        match self.authorized_get_client(Url::parse("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify").unwrap()).send().await {
+        let url = "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify";
+        match self.authorized_get_client(
+            url::Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?
+        ).send().await {
             Ok(response) => {
                 self.handle_login_response(response).await
             }
@@ -88,11 +92,37 @@ impl EpicAPI {
         }
     }
 
+    /// Start a client credentials session (app-level auth, no user context).
+    pub async fn start_client_credentials_session(&mut self) -> Result<bool, EpicAPIError> {
+        let params = [
+            ("grant_type".to_string(), "client_credentials".to_string()),
+            ("token_type".to_string(), "eg1".to_string()),
+        ];
+
+        match self
+            .client
+            .post("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
+            .form(&params)
+            .basic_auth(
+                "34a02cf8f4414e29b15921876da36f9a",
+                Some("daafbccc737745039dffe53d94fc76cf"),
+            )
+            .send()
+            .await
+        {
+            Ok(response) => self.handle_login_response(response).await,
+            Err(e) => {
+                error!("{:?}", e);
+                Err(EpicAPIError::Unknown)
+            }
+        }
+    }
+
+    /// Invalidate the current session (note: method name has a known typo).
     pub async fn invalidate_sesion(&mut self) -> bool {
         if let Some(access_token) = &self.user_data.access_token {
             let url = format!("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}", access_token);
-            let client = EpicAPI::build_client().build().unwrap();
-            match client.delete(Url::from_str(&url).unwrap()).send().await {
+            match self.client.delete(&url).send().await {
                 Ok(_) => {
                     info!("Session invalidated");
                     return true;

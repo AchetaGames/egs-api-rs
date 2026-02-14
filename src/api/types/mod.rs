@@ -30,3 +30,27 @@ pub mod fab_library;
 
 /// Fab Asset Manifest
 pub mod fab_asset_manifest;
+
+/// Catalog Item structures
+pub mod catalog_item;
+
+/// Catalog Offer structures
+pub mod catalog_offer;
+
+/// Currency structures
+pub mod currency;
+
+/// Price structures
+pub mod price;
+
+/// Service Status structures
+pub mod service_status;
+
+/// Presence structures
+pub mod presence;
+
+/// Billing Account structures
+pub mod billing_account;
+
+/// Quick Purchase structures
+pub mod quick_purchase;
