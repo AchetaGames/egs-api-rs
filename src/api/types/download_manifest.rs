@@ -135,6 +135,335 @@ where
     Ok(data)
 }
 
+fn parse_header(buffer: &[u8]) -> Option<(Vec<u8>, usize, u32)> {
+    let mut position: usize = 0;
+
+    let magic = crate::api::utils::read_le(buffer, &mut position);
+    if magic != 1153351692 {
+        debug!("No header magic, not a binary manifest");
+        return None;
+    }
+    let mut header_size = crate::api::utils::read_le(buffer, &mut position);
+    debug!("Header size: {}", header_size);
+    let _size_uncompressed = crate::api::utils::read_le(buffer, &mut position);
+    let _size_compressed = crate::api::utils::read_le(buffer, &mut position);
+    position += 20;
+    let sha_hash: [u8; 20] = match buffer[position - 20..position].try_into() {
+        Ok(h) => h,
+        Err(_) => {
+            error!("Buffer too short for SHA hash");
+            return None;
+        }
+    };
+    let compressed = !matches!(buffer[position], 0);
+    position += 1;
+    let _version = crate::api::utils::read_le(buffer, &mut position);
+
+    let mut position_after_header = position;
+    let data = if compressed {
+        debug!("Uncompressing");
+        let mut z = ZlibDecoder::new(&buffer[position..]);
+        let mut data: Vec<u8> = Vec::new();
+        if z.read_to_end(&mut data).is_err() {
+            error!("Failed to decompress manifest data");
+            return None;
+        }
+        if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data)) {
+            error!("The extracted hash does not match");
+            return None;
+        }
+        position_after_header = 0;
+        header_size = 0;
+        data
+    } else {
+        buffer.to_vec()
+    };
+
+    debug!(
+        "Download manifest header read length(needs to match {}): {}",
+        header_size, position_after_header
+    );
+
+    Some((data, position_after_header, header_size))
+}
+
+fn parse_meta(buffer: &[u8], position: &mut usize, res: &mut DownloadManifest) -> u32 {
+    let meta_size = crate::api::utils::read_le(buffer, position);
+
+    let data_version = buffer[*position];
+    *position += 1;
+
+    res.manifest_file_version = crate::api::utils::read_le(buffer, position).into();
+
+    res.b_is_file_data = !matches!(buffer[*position], 0);
+    *position += 1;
+    res.app_id = crate::api::utils::read_le(buffer, position) as u128;
+    res.app_name_string = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    res.build_version_string =
+        crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    res.launch_exe_string = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    res.launch_command = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+
+    let entries = crate::api::utils::read_le(buffer, position);
+    let mut prereq_ids: Vec<String> = Vec::new();
+    for _ in 0..entries {
+        if let Some(s) = crate::api::utils::read_fstring(buffer, position) {
+            prereq_ids.push(s)
+        }
+    }
+    if prereq_ids.is_empty() {
+        res.prereq_ids = None
+    } else {
+        res.prereq_ids = Some(prereq_ids);
+    }
+
+    res.prereq_name = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    res.prereq_path = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    res.prereq_args = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+
+    if data_version >= 1 {
+        res.build_version_string =
+            crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    }
+    if data_version >= 2 {
+        res.uninstall_action_path =
+            Some(crate::api::utils::read_fstring(buffer, position).unwrap_or_default());
+        res.uninstall_action_args =
+            Some(crate::api::utils::read_fstring(buffer, position).unwrap_or_default());
+    }
+
+    debug!("Manifest end position {}", position);
+
+    meta_size
+}
+
+fn parse_chunks(buffer: &[u8], position: &mut usize, res: &mut DownloadManifest) -> u32 {
+    let chunk_size = crate::api::utils::read_le(buffer, position);
+    debug!("Chunk size {}", chunk_size);
+
+    let _version = buffer[*position];
+    debug!("version: {}", _version);
+    *position += 1;
+
+    debug!("Chunk count at position: {}", position);
+    let count = crate::api::utils::read_le(buffer, position);
+    debug!("Reading {} chunks", count);
+
+    let mut chunks: Vec<BinaryChunkInfo> = Vec::new();
+    for _i in 0..count {
+        chunks.push(BinaryChunkInfo {
+            manifest_version: res.manifest_file_version,
+            guid: format!(
+                "{:08x}{:08x}{:08x}{:08x}",
+                crate::api::utils::read_le(buffer, position),
+                crate::api::utils::read_le(buffer, position),
+                crate::api::utils::read_le(buffer, position),
+                crate::api::utils::read_le(buffer, position)
+            ),
+            hash: 0,
+            sha_hash: Vec::new(),
+            group_num: 0,
+            window_size: 0,
+            file_size: 0,
+        });
+    }
+
+    debug!("Reading Chunk Hashes");
+    for chunk in chunks.iter_mut() {
+        chunk.hash = crate::api::utils::read_le_64(buffer, position) as u128;
+    }
+    debug!("Reading Chunk Sha Hashes");
+    for chunk in chunks.iter_mut() {
+        *position += 20;
+        chunk.sha_hash = buffer[*position - 20..*position].into();
+    }
+
+    debug!("Reading Chunk group nums");
+    for chunk in chunks.iter_mut() {
+        chunk.group_num = buffer[*position];
+        *position += 1;
+    }
+    for chunk in chunks.iter_mut() {
+        chunk.window_size = crate::api::utils::read_le(buffer, position);
+    }
+    for chunk in chunks.iter_mut() {
+        chunk.file_size = crate::api::utils::read_le_64_signed(buffer, position);
+    }
+
+    let mut chunk_sha_list: HashMap<String, String> = HashMap::new();
+    for chunk in chunks {
+        chunk_sha_list.insert(
+            chunk.guid.clone(),
+            chunk.sha_hash.iter().fold(String::new(), |mut output, b| {
+                let _ = write!(output, "{b:02x}");
+                output
+            }),
+        );
+        res.chunk_hash_list.insert(chunk.guid.clone(), chunk.hash);
+        res.chunk_filesize_list.insert(
+            chunk.guid.clone(),
+            u128::try_from(chunk.file_size).unwrap_or_default(),
+        );
+        res.data_group_list
+            .insert(chunk.guid, chunk.group_num.into());
+    }
+    res.chunk_sha_list = Some(chunk_sha_list);
+
+    chunk_size
+}
+
+fn parse_files(buffer: &[u8], position: &mut usize, res: &mut DownloadManifest) -> u32 {
+    let filemanifest_size = crate::api::utils::read_le(buffer, position);
+
+    let fm_version = buffer[*position];
+    debug!("File manifest version: {}", fm_version);
+    *position += 1;
+    let count = crate::api::utils::read_le(buffer, position);
+
+    let mut files: Vec<BinaryFileManifest> = Vec::new();
+    for _ in 0..count {
+        files.push(BinaryFileManifest {
+            filename: crate::api::utils::read_fstring(buffer, position).unwrap_or_default(),
+            symlink_target: "".to_string(),
+            hash: vec![],
+            hash_md5: vec![],
+            hash_sha256: vec![],
+            mime_type: "".to_string(),
+            flags: 0,
+            install_tags: vec![],
+            chunk_parts: vec![],
+            file_size: 0,
+        });
+    }
+
+    for file in files.iter_mut() {
+        file.symlink_target = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+    }
+
+    for file in files.iter_mut() {
+        *position += 20;
+        file.hash = buffer[*position - 20..*position].into();
+    }
+
+    for file in files.iter_mut() {
+        file.flags = buffer[*position];
+        *position += 1;
+    }
+
+    for file in files.iter_mut() {
+        let elem_count = crate::api::utils::read_le(buffer, position);
+        for _ in 0..elem_count {
+            file.install_tags
+                .push(crate::api::utils::read_fstring(buffer, position).unwrap_or_default())
+        }
+    }
+
+    // File Chunks
+    for i in 0..count {
+        if let Some(file) = files.get_mut(i as usize) {
+            let elem_count = crate::api::utils::read_le(buffer, position);
+            let mut offset: u128 = 0;
+            for _i in 0..elem_count {
+                let total = *position;
+                let chunk_size = crate::api::utils::read_le(buffer, position);
+                let chunk = BinaryChunkPart {
+                    guid: format!(
+                        "{:08x}{:08x}{:08x}{:08x}",
+                        crate::api::utils::read_le(buffer, position),
+                        crate::api::utils::read_le(buffer, position),
+                        crate::api::utils::read_le(buffer, position),
+                        crate::api::utils::read_le(buffer, position)
+                    ),
+                    offset: crate::api::utils::read_le(buffer, position) as u128,
+                    size: crate::api::utils::read_le(buffer, position) as u128,
+                    file_offset: offset,
+                };
+                offset += chunk.size;
+                let diff = *position - total - chunk_size as usize;
+                if diff > 0 {
+                    warn!("Did not read the entire chunk part!");
+                    *position += diff
+                }
+                file.chunk_parts.push(chunk);
+            }
+        }
+    }
+
+    if fm_version >= 1 {
+        for file in files.iter_mut() {
+            let has_md5 = crate::api::utils::read_le(buffer, position);
+            if has_md5 != 0 {
+                *position += 16;
+                file.hash_md5 = buffer[*position - 16..*position].into();
+            }
+        }
+        for file in files.iter_mut() {
+            file.mime_type = crate::api::utils::read_fstring(buffer, position).unwrap_or_default();
+        }
+    }
+
+    if fm_version >= 2 {
+        for file in files.iter_mut() {
+            *position += 32;
+            file.hash_sha256 = buffer[*position - 32..*position].into();
+        }
+    }
+
+    for file in files.iter_mut() {
+        file.file_size = file.chunk_parts.iter().map(|chunk| chunk.size).sum();
+    }
+
+    for file in files.iter_mut() {
+        let mut chunks: Vec<FileChunkPart> = Vec::new();
+        for chunk in &file.chunk_parts {
+            chunks.push(FileChunkPart {
+                guid: chunk.guid.clone(),
+                link: None,
+                offset: chunk.offset,
+                size: chunk.size,
+            })
+        }
+        res.file_manifest_list.push(FileManifestList {
+            filename: file.filename.clone(),
+            file_hash: file.hash.iter().fold(String::new(), |mut output, b| {
+                let _ = write!(output, "{b:02x}");
+                output
+            }),
+            file_chunk_parts: chunks,
+        })
+    }
+
+    filemanifest_size
+}
+
+fn parse_custom_fields(buffer: &[u8], position: &mut usize, res: &mut DownloadManifest) -> u32 {
+    let size = crate::api::utils::read_le(buffer, position);
+
+    let _version = buffer[*position];
+    *position += 1;
+    let count = crate::api::utils::read_le(buffer, position);
+
+    let mut keys: Vec<String> = Vec::new();
+    let mut values: Vec<String> = Vec::new();
+
+    for _ in 0..count {
+        keys.push(crate::api::utils::read_fstring(buffer, position).unwrap_or_default());
+    }
+
+    for _ in 0..count {
+        values.push(crate::api::utils::read_fstring(buffer, position).unwrap_or_default());
+    }
+
+    let mut custom_fields: HashMap<String, String> = HashMap::new();
+    for i in 0..count {
+        custom_fields.insert(keys[i as usize].clone(), values[i as usize].clone());
+    }
+
+    res.custom_fields = Some(custom_fields);
+
+    size
+}
+
 impl DownloadManifest {
     /// Get chunk dir based on the manifest version
     fn chunk_dir(version: u128) -> &'static str {
@@ -291,7 +620,7 @@ impl DownloadManifest {
     }
 
     /// Creates the structure from binary data
-    pub fn from_vec(mut buffer: Vec<u8>) -> Option<DownloadManifest> {
+    pub fn from_vec(buffer: Vec<u8>) -> Option<DownloadManifest> {
         let mut res = DownloadManifest {
             manifest_file_version: 0,
             b_is_file_data: false,
@@ -314,107 +643,11 @@ impl DownloadManifest {
             custom_fields: Default::default(),
         };
 
-        let mut position: usize = 0;
-
         // Reading Header
-        let magic = crate::api::utils::read_le(&buffer, &mut position);
-        if magic != 1153351692 {
-            debug!("No header magic, not a binary manifest");
-            return None;
-        }
-        let mut header_size = crate::api::utils::read_le(&buffer, &mut position);
-        debug!("Header size: {}", header_size);
-        let _size_uncompressed = crate::api::utils::read_le(&buffer, &mut position);
-        let _size_compressed = crate::api::utils::read_le(&buffer, &mut position);
-        position += 20;
-        let sha_hash: [u8; 20] = match buffer[position - 20..position].try_into() {
-            Ok(h) => h,
-            Err(_) => {
-                error!("Buffer too short for SHA hash");
-                return None;
-            }
-        };
-        let compressed = !matches!(buffer[position], 0);
-        position += 1;
-        let _version = crate::api::utils::read_le(&buffer, &mut position);
-
-        buffer = if compressed {
-            debug!("Uncompressing");
-            let mut z = ZlibDecoder::new(&buffer[position..]);
-            let mut data: Vec<u8> = Vec::new();
-            if z.read_to_end(&mut data).is_err() {
-                error!("Failed to decompress manifest data");
-                return None;
-            }
-            if !crate::api::utils::do_vecs_match(sha_hash.as_ref(), &Sha1::digest(&data)) {
-                error!("The extracted hash does not match");
-                return None;
-            }
-            position = 0;
-            header_size = 0;
-            data
-        } else {
-            buffer
-        };
-
-        debug!(
-            "Download manifest header read length(needs to match {}): {}",
-            header_size, position
-        );
+        let (buffer, mut position, header_size) = parse_header(&buffer)?;
 
         // Manifest Meta
-
-        let meta_size = crate::api::utils::read_le(&buffer, &mut position);
-
-        let data_version = buffer[position];
-        position += 1;
-
-        res.manifest_file_version = crate::api::utils::read_le(&buffer, &mut position).into();
-
-        res.b_is_file_data = !matches!(buffer[position], 0);
-        position += 1;
-        res.app_id = crate::api::utils::read_le(&buffer, &mut position) as u128;
-        res.app_name_string =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        res.build_version_string =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        res.launch_exe_string =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        res.launch_command =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-
-        let entries = crate::api::utils::read_le(&buffer, &mut position);
-        let mut prereq_ids: Vec<String> = Vec::new();
-        for _ in 0..entries {
-            if let Some(s) = crate::api::utils::read_fstring(&buffer, &mut position) {
-                prereq_ids.push(s)
-            }
-        }
-        if prereq_ids.is_empty() {
-            res.prereq_ids = None
-        } else {
-            res.prereq_ids = Some(prereq_ids);
-        }
-
-        res.prereq_name =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        res.prereq_path =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        res.prereq_args =
-            crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-
-        if data_version >= 1 {
-            res.build_version_string =
-                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        }
-        if data_version >= 2 {
-            res.uninstall_action_path =
-                Some(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
-            res.uninstall_action_args =
-                Some(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
-        }
-
-        debug!("Manifest end position {}", position);
+        let meta_size = parse_meta(&buffer, &mut position, &mut res);
 
         debug!(
             "Manifest metadata read length(needs to match {}): {}",
@@ -423,77 +656,7 @@ impl DownloadManifest {
         );
 
         // Chunks
-
-        let chunk_size = crate::api::utils::read_le(&buffer, &mut position);
-        debug!("Chunk size {}", chunk_size);
-
-        let _version = buffer[position];
-        debug!("version: {}", _version);
-        position += 1;
-
-        debug!("Chunk count at position: {}", position);
-        let count = crate::api::utils::read_le(&buffer, &mut position);
-        debug!("Reading {} chunks", count);
-
-        let mut chunks: Vec<BinaryChunkInfo> = Vec::new();
-        for _i in 0..count {
-            chunks.push(BinaryChunkInfo {
-                manifest_version: res.manifest_file_version,
-                guid: format!(
-                    "{:08x}{:08x}{:08x}{:08x}",
-                    crate::api::utils::read_le(&buffer, &mut position),
-                    crate::api::utils::read_le(&buffer, &mut position),
-                    crate::api::utils::read_le(&buffer, &mut position),
-                    crate::api::utils::read_le(&buffer, &mut position)
-                ),
-                hash: 0,
-                sha_hash: Vec::new(),
-                group_num: 0,
-                window_size: 0,
-                file_size: 0,
-            });
-        }
-
-        debug!("Reading Chunk Hashes");
-        for chunk in chunks.iter_mut() {
-            chunk.hash = crate::api::utils::read_le_64(&buffer, &mut position) as u128;
-        }
-        debug!("Reading Chunk Sha Hashes");
-        for chunk in chunks.iter_mut() {
-            position += 20;
-            chunk.sha_hash = buffer[position - 20..position].into();
-        }
-
-        debug!("Reading Chunk group nums");
-        for chunk in chunks.iter_mut() {
-            chunk.group_num = buffer[position];
-            position += 1;
-        }
-        for chunk in chunks.iter_mut() {
-            chunk.window_size = crate::api::utils::read_le(&buffer, &mut position);
-        }
-        for chunk in chunks.iter_mut() {
-            chunk.file_size = crate::api::utils::read_le_64_signed(&buffer, &mut position);
-        }
-
-        let mut chunk_sha_list: HashMap<String, String> = HashMap::new();
-        for chunk in chunks {
-            chunk_sha_list.insert(
-                chunk.guid.clone(),
-                chunk.sha_hash.iter().fold(String::new(), |mut output, b| {
-                    let _ = write!(output, "{b:02x}");
-                    output
-                }),
-            );
-            res.chunk_hash_list.insert(chunk.guid.clone(), chunk.hash);
-            res.chunk_filesize_list.insert(
-                chunk.guid.clone(),
-                u128::try_from(chunk.file_size).unwrap_or_default(),
-            );
-            res.data_group_list
-                .insert(chunk.guid, chunk.group_num.into());
-        }
-        res.chunk_sha_list = Some(chunk_sha_list);
+        let chunk_size = parse_chunks(&buffer, &mut position, &mut res);
 
         debug!(
             "Chunks read length(needs to match {}): {}",
@@ -502,130 +665,7 @@ impl DownloadManifest {
         );
 
         // File Manifest
-
-        let filemanifest_size = crate::api::utils::read_le(&buffer, &mut position);
-
-        let fm_version = buffer[position];
-        debug!("File manifest version: {}", fm_version);
-        position += 1;
-        let count = crate::api::utils::read_le(&buffer, &mut position);
-
-        let mut files: Vec<BinaryFileManifest> = Vec::new();
-        for _ in 0..count {
-            files.push(BinaryFileManifest {
-                filename: crate::api::utils::read_fstring(&buffer, &mut position)
-                    .unwrap_or_default(),
-                symlink_target: "".to_string(),
-                hash: vec![],
-                hash_md5: vec![],
-                hash_sha256: vec![],
-                mime_type: "".to_string(),
-                flags: 0,
-                install_tags: vec![],
-                chunk_parts: vec![],
-                file_size: 0,
-            });
-        }
-
-        for file in files.iter_mut() {
-            file.symlink_target =
-                crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-        }
-
-        for file in files.iter_mut() {
-            position += 20;
-            file.hash = buffer[position - 20..position].into();
-        }
-
-        for file in files.iter_mut() {
-            file.flags = buffer[position];
-            position += 1;
-        }
-
-        for file in files.iter_mut() {
-            let elem_count = crate::api::utils::read_le(&buffer, &mut position);
-            for _ in 0..elem_count {
-                file.install_tags.push(
-                    crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default(),
-                )
-            }
-        }
-
-        // File Chunks
-        for i in 0..count {
-            if let Some(file) = files.get_mut(i as usize) {
-                let elem_count = crate::api::utils::read_le(&buffer, &mut position);
-                let mut offset: u128 = 0;
-                for _i in 0..elem_count {
-                    let total = position;
-                    let chunk_size = crate::api::utils::read_le(&buffer, &mut position);
-                    let chunk = BinaryChunkPart {
-                        guid: format!(
-                            "{:08x}{:08x}{:08x}{:08x}",
-                            crate::api::utils::read_le(&buffer, &mut position),
-                            crate::api::utils::read_le(&buffer, &mut position),
-                            crate::api::utils::read_le(&buffer, &mut position),
-                            crate::api::utils::read_le(&buffer, &mut position)
-                        ),
-                        offset: crate::api::utils::read_le(&buffer, &mut position) as u128,
-                        size: crate::api::utils::read_le(&buffer, &mut position) as u128,
-                        file_offset: offset,
-                    };
-                    offset += chunk.size;
-                    let diff = position - total - chunk_size as usize;
-                    if diff > 0 {
-                        warn!("Did not read the entire chunk part!");
-                        position += diff
-                    }
-                    file.chunk_parts.push(chunk);
-                }
-            }
-        }
-
-        if fm_version >= 1 {
-            for file in files.iter_mut() {
-                let has_md5 = crate::api::utils::read_le(&buffer, &mut position);
-                if has_md5 != 0 {
-                    position += 16;
-                    file.hash_md5 = buffer[position - 16..position].into();
-                }
-            }
-            for file in files.iter_mut() {
-                file.mime_type =
-                    crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default();
-            }
-        }
-
-        if fm_version >= 2 {
-            for file in files.iter_mut() {
-                position += 32;
-                file.hash_sha256 = buffer[position - 32..position].into();
-            }
-        }
-
-        for file in files.iter_mut() {
-            file.file_size = file.chunk_parts.iter().map(|chunk| chunk.size).sum();
-        }
-
-        for file in files.iter_mut() {
-            let mut chunks: Vec<FileChunkPart> = Vec::new();
-            for chunk in &file.chunk_parts {
-                chunks.push(FileChunkPart {
-                    guid: chunk.guid.clone(),
-                    link: None,
-                    offset: chunk.offset,
-                    size: chunk.size,
-                })
-            }
-            res.file_manifest_list.push(FileManifestList {
-                filename: file.filename.clone(),
-                file_hash: file.hash.iter().fold(String::new(), |mut output, b| {
-                    let _ = write!(output, "{b:02x}");
-                    output
-                }),
-                file_chunk_parts: chunks,
-            })
-        }
+        let filemanifest_size = parse_files(&buffer, &mut position, &mut res);
 
         debug!(
             "File Manifests read length(needs to match {}): {}",
@@ -634,31 +674,7 @@ impl DownloadManifest {
         );
 
         // Custom Fields
-
-        let size = crate::api::utils::read_le(&buffer, &mut position);
-
-        let _version = buffer[position];
-        position += 1;
-        let count = crate::api::utils::read_le(&buffer, &mut position);
-
-        let mut keys: Vec<String> = Vec::new();
-        let mut values: Vec<String> = Vec::new();
-
-        for _ in 0..count {
-            keys.push(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
-        }
-
-        for _ in 0..count {
-            values
-                .push(crate::api::utils::read_fstring(&buffer, &mut position).unwrap_or_default());
-        }
-
-        let mut custom_fields: HashMap<String, String> = HashMap::new();
-        for i in 0..count {
-            custom_fields.insert(keys[i as usize].clone(), values[i as usize].clone());
-        }
-
-        res.custom_fields = Some(custom_fields);
+        let size = parse_custom_fields(&buffer, &mut position, &mut res);
 
         debug!(
             "Custom fields read length(needs to match {}): {}",
@@ -684,10 +700,7 @@ impl DownloadManifest {
         Some(res)
     }
 
-    /// Return a vector containing the manifest data
-    pub fn to_vec(&self) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new();
-
+    fn write_meta(&self) -> Vec<u8> {
         let mut data: Vec<u8> = Vec::new();
         let mut meta: Vec<u8> = Vec::new();
         // Data version
@@ -753,9 +766,11 @@ impl DownloadManifest {
                 .borrow_mut(),
         );
         data.append(meta.borrow_mut());
+        data
+    }
 
-        // Chunks
-
+    fn write_chunks(&self) -> Vec<u8> {
+        let mut data: Vec<u8> = Vec::new();
         // version
         let mut chunks: Vec<u8> = vec![0];
 
@@ -846,9 +861,11 @@ impl DownloadManifest {
                 .borrow_mut(),
         );
         data.append(chunks.borrow_mut());
+        data
+    }
 
-        // File Manifest
-
+    fn write_files(&self) -> Vec<u8> {
+        let mut data: Vec<u8> = Vec::new();
         // version
         let mut files: Vec<u8> = vec![0];
 
@@ -937,8 +954,11 @@ impl DownloadManifest {
                 .borrow_mut(),
         );
         data.append(files.borrow_mut());
+        data
+    }
 
-        // Custom Fields
+    fn write_custom_fields(&self) -> Vec<u8> {
+        let mut data: Vec<u8> = Vec::new();
         // version
         let mut custom: Vec<u8> = vec![0];
 
@@ -972,6 +992,18 @@ impl DownloadManifest {
                 .borrow_mut(),
         );
         data.append(custom.borrow_mut());
+        data
+    }
+
+    /// Return a vector containing the manifest data
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+
+        let mut data: Vec<u8> = Vec::new();
+        data.append(self.write_meta().borrow_mut());
+        data.append(self.write_chunks().borrow_mut());
+        data.append(self.write_files().borrow_mut());
+        data.append(self.write_custom_fields().borrow_mut());
 
         // FINISHING METADATA (Probably done)
 
