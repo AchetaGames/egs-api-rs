@@ -28,6 +28,9 @@ pub mod account;
 
 /// EGS Methods
 pub mod egs;
+#[allow(dead_code)]
+/// Cloud Save Methods
+pub mod cloud_save;
 /// Session Handling
 pub mod login;
 
@@ -39,6 +42,9 @@ pub mod status;
 
 /// Presence Methods
 pub mod presence;
+
+/// Uplay/Ubisoft Store Methods
+pub mod store;
 
 #[derive(Debug, Clone)]
 pub(crate) struct EpicAPI {
@@ -203,6 +209,30 @@ impl EpicAPI {
                 error!("{:?}", e);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    #[allow(dead_code)]
+    /// Send an authorized DELETE request, returning Ok(()) on success
+    pub(crate) async fn authorized_delete(&self, url: &str) -> Result<(), EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .set_authorization_header(self.client.delete(parsed_url))
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::NetworkError(e)
+            })?;
+        if response.status() == reqwest::StatusCode::OK
+            || response.status() == reqwest::StatusCode::NO_CONTENT
+        {
+            Ok(())
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();

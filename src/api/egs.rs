@@ -155,6 +155,85 @@ impl EpicAPI {
         .await
     }
 
+    /// Fetch an artifact service ticket for EOS Helper manifest retrieval.
+    ///
+    /// The `sandbox_id` is typically the same as the game's namespace,
+    /// and `artifact_id` is the same as the app name.
+    pub async fn artifact_service_ticket(
+        &self,
+        sandbox_id: &str,
+        artifact_id: &str,
+        label: Option<&str>,
+        platform: Option<&str>,
+    ) -> Result<crate::api::types::artifact_service::ArtifactServiceTicket, EpicAPIError> {
+        let url = format!(
+            "https://artifact-public-service-prod.beee.live.use1a.on.epicgames.com/artifact-service/api/public/v1/dependency/sandbox/{}/artifact/{}/ticket",
+            sandbox_id, artifact_id
+        );
+        let body = serde_json::json!({
+            "label": label.unwrap_or("Live"),
+            "expiresInSeconds": 300,
+            "platform": platform.unwrap_or("Windows"),
+        });
+        self.authorized_post_json(&url, &body).await
+    }
+
+    /// Fetch a game manifest using a signed artifact service ticket.
+    ///
+    /// This is an alternative to `asset_manifest` that uses ticket-based auth
+    /// from the EOS Helper service rather than the standard OAuth flow.
+    pub async fn game_manifest_by_ticket(
+        &self,
+        artifact_id: &str,
+        signed_ticket: &str,
+        label: Option<&str>,
+        platform: Option<&str>,
+    ) -> Result<AssetManifest, EpicAPIError> {
+        let url = format!(
+            "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/by-ticket/app/{}",
+            artifact_id
+        );
+        let body = serde_json::json!({
+            "platform": platform.unwrap_or("Windows"),
+            "label": label.unwrap_or("Live"),
+            "signedTicket": signed_ticket,
+        });
+        self.authorized_post_json(&url, &body).await
+    }
+
+    /// Fetch launcher manifests for self-update checks.
+    ///
+    /// Returns the launcher's own asset manifest for a given platform.
+    pub async fn launcher_manifests(
+        &self,
+        platform: Option<&str>,
+        label: Option<&str>,
+    ) -> Result<AssetManifest, EpicAPIError> {
+        let url = format!(
+            "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/launcher?label={}",
+            platform.unwrap_or("Windows"),
+            label.unwrap_or("Live-EternalKnight"),
+        );
+        self.authorized_get_json(&url).await
+    }
+
+    /// Try to fetch a delta manifest for optimized patching between builds.
+    ///
+    /// Delta manifests reduce download size when updating from one version to another.
+    /// Returns `None` if no delta manifest is available (most games don't have them).
+    pub async fn delta_manifest(
+        &self,
+        base_url: &str,
+        old_build_id: &str,
+        new_build_id: &str,
+    ) -> Option<Vec<u8>> {
+        if old_build_id == new_build_id {
+            return None;
+        }
+        let url = format!("{}/Deltas/{}/{}.delta", base_url, new_build_id, old_build_id);
+        self.get_bytes(&url).await.ok()
+    }
+
     /// Fetch all library items, paginating internally.
     pub async fn library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
         let mut library = Library {

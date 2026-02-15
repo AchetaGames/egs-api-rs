@@ -54,3 +54,15 @@ pub mod billing_account;
 
 /// Quick Purchase structures
 pub mod quick_purchase;
+
+/// Cloud Save structures
+pub mod cloud_save;
+
+/// Artifact Service structures
+pub mod artifact_service;
+
+/// Uplay/Ubisoft integration structures
+pub mod uplay;
+
+/// Exchange Code structures
+pub mod exchange_code;

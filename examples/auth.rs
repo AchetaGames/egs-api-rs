@@ -2,6 +2,7 @@
 mod common;
 
 use egs_api::EpicGames;
+use std::io;
 
 #[tokio::main]
 async fn main() {
@@ -10,7 +11,30 @@ async fn main() {
 
     println!("=== Authentication Example ===\n");
 
-    if !common::login_or_restore(&mut egs).await {
+    let args: Vec<String> = std::env::args().collect();
+    let use_sid = args.iter().any(|a| a == "--sid");
+
+    if use_sid {
+        println!("SID auth mode. Enter your Epic session ID (SID):");
+        let mut sid = String::new();
+        io::stdin().read_line(&mut sid).unwrap();
+        let sid = sid.trim();
+
+        match egs.auth_sid(sid).await {
+            Ok(true) => {
+                println!("SID auth succeeded!");
+                common::save_token(&egs);
+            }
+            Ok(false) => {
+                eprintln!("SID auth returned false");
+                std::process::exit(1);
+            }
+            Err(e) => {
+                eprintln!("SID auth failed: {:?}", e);
+                std::process::exit(1);
+            }
+        }
+    } else if !common::login_or_restore(&mut egs).await {
         eprintln!("Authentication failed");
         std::process::exit(1);
     }
@@ -20,11 +44,5 @@ async fn main() {
     println!("Account ID: {}", details.account_id.unwrap_or_default());
 
     println!("\nToken saved. Run other examples without re-authenticating.");
-    println!("To logout, uncomment the logout section below.\n");
-
-    // Uncomment to invalidate the session and delete the saved token:
-    // if egs.logout().await {
-    //     println!("Logged out successfully");
-    //     let _ = std::fs::remove_file(dirs_or_home().join(".egs-api/token.json"));
-    // }
+    println!("Tip: use --sid flag to authenticate via session ID instead.\n");
 }

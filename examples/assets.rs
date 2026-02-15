@@ -76,4 +76,61 @@ async fn main() {
             test_asset.app_name
         ),
     }
+
+    println!("\n=== Artifact Service Ticket ===\n");
+
+    match egs
+        .artifact_service_ticket(&test_asset.namespace, &test_asset.app_name, None, None)
+        .await
+    {
+        Ok(ticket) => {
+            println!(
+                "Ticket expires in: {} seconds",
+                ticket.expires_in_seconds.unwrap_or(0)
+            );
+            if let Some(signed) = &ticket.signed_ticket {
+                println!(
+                    "Signed ticket (first 80 chars): {}...",
+                    &signed[..signed.len().min(80)]
+                );
+
+                println!("\n=== Game Manifest by Ticket ===\n");
+
+                match egs
+                    .game_manifest_by_ticket(&test_asset.app_name, signed, None, None)
+                    .await
+                {
+                    Ok(m) => println!("Manifest elements: {}", m.elements.len()),
+                    Err(e) => eprintln!("Failed to fetch manifest by ticket: {:?}", e),
+                }
+            }
+        }
+        Err(e) => eprintln!("Failed to get artifact service ticket: {:?}", e),
+    }
+
+    println!("\n=== Launcher Manifests ===\n");
+
+    match egs.launcher_manifests(None, None).await {
+        Ok(m) => {
+            println!("Launcher manifest elements: {}", m.elements.len());
+            for elem in &m.elements {
+                for manifest in &elem.manifests {
+                    println!("  URI: {}", manifest.uri);
+                }
+            }
+        }
+        Err(e) => eprintln!("Failed to fetch launcher manifests: {:?}", e),
+    }
+
+    println!("\n=== Delta Manifest ===\n");
+
+    println!("Delta manifests require two different build IDs.");
+    println!("Trying with dummy IDs to demonstrate the API (expected to return None):");
+    match egs
+        .delta_manifest("https://example.com", "old-build", "new-build")
+        .await
+    {
+        Some(data) => println!("Got delta manifest: {} bytes", data.len()),
+        None => println!("No delta manifest available (expected for most assets)."),
+    }
 }
