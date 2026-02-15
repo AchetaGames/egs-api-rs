@@ -83,7 +83,10 @@ impl EpicAPI {
                                 "Unable to parse the Download Manifest".to_string(),
                             ))
                         }
-                        Some(man) => Ok(man),
+                        Some(mut man) => {
+                            man.set_custom_field("SourceURL", distribution_point_url);
+                            Ok(man)
+                        }
                     }
                 }
             }
