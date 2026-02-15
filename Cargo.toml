@@ -3,17 +3,18 @@ name = "egs-api"
 version = "0.9.0"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description = "Interface to the Epic Games API"
-categories = ["asynchronous"]
-keywords = ["EpicGames", "Epic", "egs"]
+categories = ["api-bindings", "asynchronous", "games"]
+keywords = ["EpicGames", "Epic", "egs", "game-store", "marketplace"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/AchetaGames/egs-api-rs"
 documentation = "https://docs.rs/egs-api/latest/egs_api/"
 edition = "2018"
+rust-version = "1.82"
 autoexamples = false
 
 [dependencies]
-reqwest = { version = "0.12", features = ["json", "cookies", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "cookies"] }
 serde_json = "1.0"
 serde_with = "3"
 url = { version = "2.5", features = ["serde"] }
@@ -38,6 +39,7 @@ features = ["derive"]
 [dev-dependencies]
 webbrowser = "1"
 env_logger = "0.11"
+reqwest = { version = "0.12", features = ["blocking"] }
 
 [[example]]
 name = "workflow"
