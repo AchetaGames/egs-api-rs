@@ -27,14 +27,13 @@ impl EpicAPI {
         namespace: &str,
         offer_id: &str,
     ) -> Result<QuickPurchaseResponse, EpicAPIError> {
-        let id = match &self.user_data.account_id {
-            Some(id) => id.clone(),
+        let url = match &self.user_data.account_id {
+            Some(id) => format!(
+                "https://orderprocessor-public-service-ecomprod01.ol.epicgames.com/orderprocessor/api/shared/accounts/{}/orders/quickPurchase",
+                id
+            ),
             None => return Err(EpicAPIError::InvalidCredentials),
         };
-        let url = format!(
-            "https://orderprocessor-public-service-ecomprod01.ol.epicgames.com/orderprocessor/api/shared/accounts/{}/orders/quickPurchase",
-            id
-        );
         let body = serde_json::json!({
             "salesChannel": "Launcher-purchase-client",
             "entitlementSource": "Launcher-purchase-client",
@@ -50,14 +49,13 @@ impl EpicAPI {
 
     /// Fetch the default billing account for the logged-in user.
     pub async fn billing_account(&self) -> Result<BillingAccount, EpicAPIError> {
-        let id = match &self.user_data.account_id {
-            Some(id) => id.clone(),
+        let url = match &self.user_data.account_id {
+            Some(id) => format!(
+                "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/payment/accounts/{}/billingaccounts/default",
+                id
+            ),
             None => return Err(EpicAPIError::InvalidCredentials),
         };
-        let url = format!(
-            "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/payment/accounts/{}/billingaccounts/default",
-            id
-        );
         self.authorized_get_json(&url).await
     }
 }

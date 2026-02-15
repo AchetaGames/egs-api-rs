@@ -27,7 +27,7 @@ async fn main() {
 
     let assets = egs.list_assets(None, None).await;
     match assets.first() {
-        Some(asset) => match egs.ownership_token(asset.clone()).await {
+        Some(asset) => match egs.ownership_token(asset).await {
             Some(token) => {
                 println!(
                     "Ownership token for {} (first 80 chars): {}...",

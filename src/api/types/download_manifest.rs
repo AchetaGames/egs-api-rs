@@ -478,11 +478,16 @@ impl DownloadManifest {
         }
     }
 
-    pub(crate) fn set_custom_field(&mut self, key: String, value: String) {
+    pub(crate) fn set_custom_field(&mut self, key: &str, value: &str) {
         if let Some(fields) = self.custom_fields.as_mut() {
-            fields.insert(key, value);
+            fields.insert(key.to_string(), value.to_string());
         } else {
-            self.custom_fields = Some([(key, value)].iter().cloned().collect())
+            self.custom_fields = Some(
+                [(key.to_string(), value.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect(),
+            )
         };
     }
 
@@ -517,8 +522,8 @@ impl DownloadManifest {
         let chunk_dir = DownloadManifest::chunk_dir(self.manifest_file_version);
         let mut result: HashMap<String, Url> = HashMap::new();
 
-        for (guid, hash) in self.chunk_hash_list.clone() {
-            let group_num = match self.data_group_list.get(&guid) {
+        for (guid, hash) in &self.chunk_hash_list {
+            let group_num = match self.data_group_list.get(guid.as_str()) {
                 None => {
                     continue;
                 }
@@ -530,8 +535,8 @@ impl DownloadManifest {
                     "{}/{}/{:02}/{:016X}_{}.chunk",
                     url,
                     chunk_dir,
-                    group_num,
-                    hash,
+                    *group_num,
+                    *hash,
                     guid.to_uppercase()
                 ))
                 .unwrap(),
@@ -545,23 +550,24 @@ impl DownloadManifest {
         let mut result: HashMap<String, FileManifestList> = HashMap::new();
         let links = self.download_links().unwrap_or_default();
 
-        for file in self.file_manifest_list.clone() {
+        for file in &self.file_manifest_list {
             result.insert(
                 file.filename.clone(),
                 FileManifestList {
-                    filename: file.filename,
-                    file_hash: file.file_hash,
+                    filename: file.filename.clone(),
+                    file_hash: file.file_hash.clone(),
                     file_chunk_parts: {
                         let mut temp: Vec<FileChunkPart> = Vec::new();
-                        for part in file.file_chunk_parts {
+                        for part in &file.file_chunk_parts {
+                            let link = match links.get(&part.guid) {
+                                None => {
+                                    continue;
+                                }
+                                Some(u) => Some(u.clone()),
+                            };
                             temp.push(FileChunkPart {
                                 guid: part.guid.clone(),
-                                link: match links.get(&part.guid) {
-                                    None => {
-                                        continue;
-                                    }
-                                    Some(u) => Some(u.clone()),
-                                },
+                                link,
                                 offset: part.offset,
                                 size: part.size,
                             })
@@ -597,15 +603,13 @@ impl DownloadManifest {
         debug!("Attempting to parse download manifest from binary data");
         // debug!("attempted json {:?}", serde_json::from_slice::<DownloadManifest>(data.as_slice()));
         let hash = Sha1::digest(&data);
-        match DownloadManifest::from_vec(data.clone()) {
+        match DownloadManifest::from_vec(&data) {
             None => {
                 debug!("Not binary manifest trying json");
                 match serde_json::from_slice::<DownloadManifest>(data.as_slice()) {
                     Ok(mut dm) => {
-                        dm.set_custom_field(
-                            "DownloadedManifestHash".to_string(),
-                            format!("{:x}", hash),
-                        );
+                        let hash_string = format!("{:x}", hash);
+                        dm.set_custom_field("DownloadedManifestHash", &hash_string);
                         Some(dm)
                     }
                     Err(_) => None,
@@ -613,14 +617,15 @@ impl DownloadManifest {
             }
             Some(mut dm) => {
                 debug!("Binary parsing successful");
-                dm.set_custom_field("DownloadedManifestHash".to_string(), format!("{:x}", hash));
+                let hash_string = format!("{:x}", hash);
+                dm.set_custom_field("DownloadedManifestHash", &hash_string);
                 Some(dm)
             }
         }
     }
 
     /// Creates the structure from binary data
-    pub fn from_vec(buffer: Vec<u8>) -> Option<DownloadManifest> {
+    pub fn from_vec(buffer: &[u8]) -> Option<DownloadManifest> {
         let mut res = DownloadManifest {
             manifest_file_version: 0,
             b_is_file_data: false,
@@ -644,7 +649,7 @@ impl DownloadManifest {
         };
 
         // Reading Header
-        let (buffer, mut position, header_size) = parse_header(&buffer)?;
+        let (buffer, mut position, header_size) = parse_header(buffer)?;
 
         // Manifest Meta
         let meta_size = parse_meta(&buffer, &mut position, &mut res);
@@ -722,15 +727,13 @@ impl DownloadManifest {
             Err(_) => meta.append(0u32.to_le_bytes().to_vec().borrow_mut()),
         }
 
-        meta.append(crate::api::utils::write_fstring(self.app_name_string.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.app_name_string).borrow_mut());
 
-        meta.append(
-            crate::api::utils::write_fstring(self.build_version_string.clone()).borrow_mut(),
-        );
+        meta.append(crate::api::utils::write_fstring(&self.build_version_string).borrow_mut());
 
-        meta.append(crate::api::utils::write_fstring(self.launch_exe_string.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.launch_exe_string).borrow_mut());
 
-        meta.append(crate::api::utils::write_fstring(self.launch_command.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.launch_command).borrow_mut());
 
         match &self.prereq_ids {
             None => meta.append(0u32.to_le_bytes().to_vec().borrow_mut()),
@@ -742,21 +745,19 @@ impl DownloadManifest {
                         .borrow_mut(),
                 );
                 for prereq_id in prereq_ids {
-                    meta.append(crate::api::utils::write_fstring(prereq_id.clone()).borrow_mut());
+                    meta.append(crate::api::utils::write_fstring(prereq_id).borrow_mut());
                 }
             }
         }
 
-        meta.append(crate::api::utils::write_fstring(self.prereq_name.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.prereq_name).borrow_mut());
 
-        meta.append(crate::api::utils::write_fstring(self.prereq_path.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.prereq_path).borrow_mut());
 
-        meta.append(crate::api::utils::write_fstring(self.prereq_args.clone()).borrow_mut());
+        meta.append(crate::api::utils::write_fstring(&self.prereq_args).borrow_mut());
 
         if !self.build_version_string.is_empty() {
-            meta.append(
-                crate::api::utils::write_fstring(self.build_version_string.clone()).borrow_mut(),
-            );
+            meta.append(crate::api::utils::write_fstring(&self.build_version_string).borrow_mut());
         }
         // Meta Size
         data.append(
@@ -879,13 +880,13 @@ impl DownloadManifest {
 
         // Filenames
         for file in &self.file_manifest_list {
-            files.append(crate::api::utils::write_fstring(file.filename.clone()).borrow_mut());
+            files.append(crate::api::utils::write_fstring(&file.filename).borrow_mut());
         }
 
         // Symlink target
         // TODO: Figure out what Epic puts in theirs
         for _ in &self.file_manifest_list {
-            files.append(crate::api::utils::write_fstring("".to_string()).borrow_mut());
+            files.append(crate::api::utils::write_fstring("").borrow_mut());
         }
 
         // hash
@@ -976,10 +977,10 @@ impl DownloadManifest {
                 );
 
                 for key in custom_fields.keys() {
-                    custom.append(crate::api::utils::write_fstring(key.to_string()).borrow_mut());
+                    custom.append(crate::api::utils::write_fstring(key).borrow_mut());
                 }
                 for value in custom_fields.values() {
-                    custom.append(crate::api::utils::write_fstring(value.to_string()).borrow_mut());
+                    custom.append(crate::api::utils::write_fstring(value).borrow_mut());
                 }
             }
         }
@@ -1122,14 +1123,14 @@ mod tests {
     fn custom_field_get_set() {
         let mut manifest = DownloadManifest::default();
         assert_eq!(manifest.custom_field("foo"), None);
-        manifest.set_custom_field("foo".to_string(), "bar".to_string());
+        manifest.set_custom_field("foo", "bar");
         assert_eq!(manifest.custom_field("foo"), Some("bar".to_string()));
 
         let mut populated = DownloadManifest {
             custom_fields: Some(HashMap::from([("alpha".to_string(), "beta".to_string())])),
             ..DownloadManifest::default()
         };
-        populated.set_custom_field("gamma".to_string(), "delta".to_string());
+        populated.set_custom_field("gamma", "delta");
         assert_eq!(populated.custom_field("alpha"), Some("beta".to_string()));
         assert_eq!(populated.custom_field("gamma"), Some("delta".to_string()));
     }
@@ -1237,7 +1238,8 @@ mod tests {
             ..DownloadManifest::default()
         };
 
-        let roundtrip = DownloadManifest::from_vec(manifest.to_vec()).unwrap();
+        let manifest_vec = manifest.to_vec();
+        let roundtrip = DownloadManifest::from_vec(&manifest_vec).unwrap();
         assert_eq!(roundtrip.app_name_string, "TestApp");
         assert_eq!(roundtrip.build_version_string, "1.0.0");
         assert_eq!(roundtrip.manifest_file_version, 18);
@@ -1258,17 +1260,13 @@ mod tests {
 
     #[test]
     fn from_vec_no_magic() {
-        assert_eq!(
-            DownloadManifest::from_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]),
-            None
-        );
+        let buffer = vec![0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(DownloadManifest::from_vec(&buffer), None);
     }
 
     #[test]
     fn from_vec_too_short() {
-        assert_eq!(
-            DownloadManifest::from_vec(vec![0x4C, 0xB4, 0xCB, 0x44]),
-            None
-        );
+        let buffer = vec![0x4C, 0xB4, 0xCB, 0x44];
+        assert_eq!(DownloadManifest::from_vec(&buffer), None);
     }
 }

@@ -9,14 +9,13 @@ impl EpicAPI {
         session_id: &str,
         body: &PresenceUpdate,
     ) -> Result<(), EpicAPIError> {
-        let id = match &self.user_data.account_id {
-            Some(id) => id.clone(),
+        let url = match &self.user_data.account_id {
+            Some(id) => format!(
+                "https://presence-public-service-prod.ol.epicgames.com/presence/api/v1/_/{}/presence/{}",
+                id, session_id
+            ),
             None => return Err(EpicAPIError::InvalidCredentials),
         };
-        let url = format!(
-            "https://presence-public-service-prod.ol.epicgames.com/presence/api/v1/_/{}/presence/{}",
-            id, session_id
-        );
         let parsed_url = url::Url::parse(&url).map_err(|_| EpicAPIError::InvalidParams)?;
         let response = self
             .set_authorization_header(self.client.patch(parsed_url))

@@ -27,7 +27,7 @@ async fn main() {
     }
 
     let test_asset = match assets.first() {
-        Some(a) => a.clone(),
+        Some(a) => a,
         None => {
             println!("No assets found, nothing more to demo.");
             return;
@@ -36,7 +36,7 @@ async fn main() {
 
     println!("\n=== Asset Info (first asset) ===\n");
 
-    match egs.asset_info(test_asset.clone()).await {
+    match egs.asset_info(test_asset).await {
         Some(info) => println!("{:#?}", info),
         None => eprintln!("Failed to fetch asset info for {}", test_asset.app_name),
     }

@@ -44,7 +44,7 @@ impl EpicAPI {
             return Err(EpicAPIError::InvalidParams);
         };
         let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.clone().unwrap_or_else(|| "Windows".to_string()), namespace.clone().unwrap(), item_id.clone().unwrap(), app.clone().unwrap(), label.clone().unwrap_or_else(|| "Live".to_string()));
+                          platform.as_deref().unwrap_or("Windows"), namespace.as_deref().unwrap(), item_id.as_deref().unwrap(), app.as_deref().unwrap(), label.as_deref().unwrap_or("Live"));
         let mut manifest: AssetManifest = self.authorized_get_json(&url).await?;
         manifest.platform = platform;
         manifest.label = label;
@@ -86,41 +86,24 @@ impl EpicAPI {
                             });
                             url.set_query(None);
                             url.set_fragment(None);
-                            man.set_custom_field(
-                                "BaseUrl".to_string(),
-                                base_urls.clone(),
-                            );
+                            man.set_custom_field("BaseUrl", &base_urls);
 
-                            if let Some(id) = asset_manifest.item_id.clone() {
-                                man.set_custom_field(
-                                    "CatalogItemId".to_string(),
-                                    id.clone(),
-                                );
+                            if let Some(id) = asset_manifest.item_id.as_deref() {
+                                man.set_custom_field("CatalogItemId", id);
                             }
-                            if let Some(label) = asset_manifest.label.clone() {
-                                man.set_custom_field(
-                                    "BuildLabel".to_string(),
-                                    label.clone(),
-                                );
+                            if let Some(label) = asset_manifest.label.as_deref() {
+                                man.set_custom_field("BuildLabel", label);
                             }
-                            if let Some(ns) = asset_manifest.namespace.clone() {
-                                man.set_custom_field(
-                                    "CatalogNamespace".to_string(),
-                                    ns.clone(),
-                                );
+                            if let Some(ns) = asset_manifest.namespace.as_deref() {
+                                man.set_custom_field("CatalogNamespace", ns);
                             }
 
-                            if let Some(app) = asset_manifest.app.clone() {
-                                man.set_custom_field(
-                                    "CatalogAssetName".to_string(),
-                                    app.clone(),
-                                );
+                            if let Some(app) = asset_manifest.app.as_deref() {
+                                man.set_custom_field("CatalogAssetName", app);
                             }
 
-                            man.set_custom_field(
-                                "SourceURL".to_string(),
-                                url.to_string(),
-                            );
+                            let source_url = url.to_string();
+                            man.set_custom_field("SourceURL", &source_url);
                             result.push(man)
                         }
                     },
@@ -136,7 +119,7 @@ impl EpicAPI {
     /// Fetch catalog metadata for an asset, including DLC details.
     pub async fn asset_info(
         &self,
-        asset: EpicAsset,
+        asset: &EpicAsset,
     ) -> Result<HashMap<String, AssetInfo>, EpicAPIError> {
         let url = format!("https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/{}/bulk/items?id={}&includeDLCDetails=true&includeMainGameDetails=true&country=us&locale=lc",
                           asset.namespace, asset.catalog_item_id);
@@ -152,7 +135,7 @@ impl EpicAPI {
     }
 
     /// Fetch a JWT ownership token for the given asset.
-    pub async fn ownership_token(&self, asset: EpicAsset) -> Result<OwnershipToken, EpicAPIError> {
+    pub async fn ownership_token(&self, asset: &EpicAsset) -> Result<OwnershipToken, EpicAPIError> {
         let url = match &self.user_data.account_id {
             None => {
                 return Err(EpicAPIError::InvalidCredentials);

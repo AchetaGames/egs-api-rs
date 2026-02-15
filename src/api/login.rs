@@ -17,7 +17,11 @@ impl EpicAPI {
                     ("grant_type".to_string(), "refresh_token".to_string()),
                     (
                         "refresh_token".to_string(),
-                        self.user_data.refresh_token.clone().unwrap(),
+                        self.user_data
+                            .refresh_token
+                            .as_ref()
+                            .ok_or(EpicAPIError::InvalidCredentials)?
+                            .clone(),
                     ),
                     ("token_type".to_string(), "eg1".to_string()),
                 ],

@@ -298,8 +298,8 @@ impl EpicGames {
     /// Fetch catalog metadata for an asset (includes DLC tree).
     ///
     /// Returns `None` on API errors.
-    pub async fn asset_info(&mut self, asset: EpicAsset) -> Option<AssetInfo> {
-        match self.egs.asset_info(asset.clone()).await {
+    pub async fn asset_info(&mut self, asset: &EpicAsset) -> Option<AssetInfo> {
+        match self.egs.asset_info(asset).await {
             Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
             Err(_) => None,
         }
@@ -348,7 +348,7 @@ impl EpicGames {
     /// Fetch a JWT proving ownership of an asset.
     ///
     /// Returns `None` on API errors.
-    pub async fn ownership_token(&mut self, asset: EpicAsset) -> Option<String> {
+    pub async fn ownership_token(&mut self, asset: &EpicAsset) -> Option<String> {
         match self.egs.ownership_token(asset).await {
             Ok(a) => Some(a.token),
             Err(_) => None,

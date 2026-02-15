@@ -90,7 +90,7 @@ pub(crate) fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .collect()
 }
 
-pub(crate) fn write_fstring(string: String) -> Vec<u8> {
+pub(crate) fn write_fstring(string: &str) -> Vec<u8> {
     let mut meta: Vec<u8> = Vec::new();
     if !string.is_empty() {
         meta.append(
@@ -99,7 +99,7 @@ pub(crate) fn write_fstring(string: String) -> Vec<u8> {
                 .to_vec()
                 .borrow_mut(),
         );
-        meta.append(string.into_bytes().borrow_mut());
+        meta.append(string.as_bytes().to_vec().borrow_mut());
         meta.push(0);
     } else {
         meta.append(0u32.to_le_bytes().to_vec().borrow_mut())
@@ -198,20 +198,20 @@ mod tests {
 
     #[test]
     fn write_fstring_nonempty() {
-        let buffer = write_fstring("hello".to_string());
+        let buffer = write_fstring("hello");
         assert_eq!(buffer, vec![6, 0, 0, 0, 104, 101, 108, 108, 111, 0])
     }
 
     #[test]
     fn write_fstring_empty() {
-        let buffer = write_fstring("".to_string());
+        let buffer = write_fstring("");
         assert_eq!(buffer, vec![0, 0, 0, 0])
     }
 
     #[test]
     fn write_fstring_roundtrip() {
         let original = "roundtrip".to_string();
-        let buffer = write_fstring(original.clone());
+        let buffer = write_fstring(&original);
         let mut position: usize = 0;
         assert_eq!(read_fstring(&buffer, &mut position), Some(original));
     }

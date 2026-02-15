@@ -64,7 +64,7 @@ async fn main() {
 
     // Get detailed info for the first asset
     if let Some(asset) = assets.first() {
-        if let Some(info) = egs.asset_info(asset.clone()).await {
+        if let Some(info) = egs.asset_info(asset).await {
             println!("{}: {}", info.id, info.title.unwrap_or_default());
         }
     }

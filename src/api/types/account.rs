@@ -82,13 +82,13 @@ impl UserData {
     }
 
     /// Get access token
-    pub fn access_token(&self) -> Option<String> {
-        self.access_token.clone()
+    pub fn access_token(&self) -> Option<&str> {
+        self.access_token.as_deref()
     }
 
     /// Get refresh token
-    pub fn refresh_token(&self) -> Option<String> {
-        self.refresh_token.clone()
+    pub fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
     }
 
     /// Set access token
@@ -241,7 +241,7 @@ mod tests {
         let mut ud = UserData::new();
         assert_eq!(ud.access_token(), None);
         ud.set_access_token(Some("my_token".to_string()));
-        assert_eq!(ud.access_token(), Some("my_token".to_string()));
+        assert_eq!(ud.access_token(), Some("my_token"));
     }
 
     #[test]
@@ -249,7 +249,7 @@ mod tests {
         let mut ud = UserData::new();
         assert_eq!(ud.refresh_token(), None);
         ud.set_refresh_token(Some("refresh_tok".to_string()));
-        assert_eq!(ud.refresh_token(), Some("refresh_tok".to_string()));
+        assert_eq!(ud.refresh_token(), Some("refresh_tok"));
     }
 }
 

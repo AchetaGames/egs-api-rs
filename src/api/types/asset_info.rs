@@ -56,7 +56,8 @@ impl AssetInfo {
 
     /// Get list of sorted releases newest to oldest
     pub fn sorted_releases(&self) -> Option<Vec<ReleaseInfo>> {
-        if let Some(mut release_info) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
+            let mut release_info = releases.clone();
             release_info.sort_by_key(|ri| ri.date_added);
             release_info.reverse();
             Some(release_info)
@@ -67,10 +68,10 @@ impl AssetInfo {
 
     /// Get release info based on the release id
     pub fn release_info(&self, id: &str) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
             for release in releases {
-                if release.id.clone().unwrap_or_default().eq(id) {
-                    return Some(release);
+                if release.id.as_deref().unwrap_or_default() == id {
+                    return Some(release.clone());
                 }
             }
         };
@@ -79,10 +80,10 @@ impl AssetInfo {
 
     /// Get release info based on the release name
     pub fn release_name(&self, name: &str) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
             for release in releases {
-                if release.app_id.clone().unwrap_or_default().eq(name) {
-                    return Some(release);
+                if release.app_id.as_deref().unwrap_or_default() == name {
+                    return Some(release.clone());
                 }
             }
         };
@@ -96,7 +97,7 @@ impl AssetInfo {
             for info in release_infos {
                 match &info.compatible_apps {
                     None => {}
-                    Some(ca) => res.append(&mut ca.clone()),
+                    Some(ca) => res.extend(ca.iter().cloned()),
                 };
             }
             res.sort();
@@ -113,7 +114,7 @@ impl AssetInfo {
             for info in release_infos {
                 match &info.platform {
                     None => {}
-                    Some(p) => res.append(&mut p.clone()),
+                    Some(p) => res.extend(p.iter().cloned()),
                 };
             }
             res.sort();
