@@ -13,6 +13,10 @@ pub mod types;
 /// Various API Utils
 pub mod utils;
 
+/// Binary reader/writer for manifest parsing
+#[allow(dead_code)]
+pub(crate) mod binary_rw;
+
 /// Error type
 pub mod error;
 
@@ -109,20 +113,18 @@ impl EpicAPI {
             .await
             .map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
             response.json::<T>().await.map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
-            warn!(
-                "{} result: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            );
-            Err(EpicAPIError::Unknown)
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
         }
     }
 
@@ -140,20 +142,18 @@ impl EpicAPI {
             .await
             .map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
             response.json::<T>().await.map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
-            warn!(
-                "{} result: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            );
-            Err(EpicAPIError::Unknown)
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
         }
     }
 
@@ -171,20 +171,18 @@ impl EpicAPI {
             .await
             .map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
             response.json::<T>().await.map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
-            warn!(
-                "{} result: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            );
-            Err(EpicAPIError::Unknown)
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
         }
     }
 
@@ -198,20 +196,18 @@ impl EpicAPI {
             .await
             .map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
             response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
                 error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
-            warn!(
-                "{} result: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            );
-            Err(EpicAPIError::Unknown)
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
         }
     }
 }
