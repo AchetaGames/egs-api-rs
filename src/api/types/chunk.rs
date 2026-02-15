@@ -65,11 +65,95 @@ impl Chunk {
         res.data = if res.compressed {
             let mut z = ZlibDecoder::new(&buffer[position..]);
             let mut data: Vec<u8> = Vec::new();
-            z.read_to_end(&mut data).unwrap();
+            if z.read_to_end(&mut data).is_err() {
+                error!("Failed to decompress chunk data");
+                return None;
+            }
             data
         } else {
             buffer[position..].to_vec()
         };
         Some(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    #[test]
+    fn from_vec_wrong_magic() {
+        let buffer = vec![0u8; 45];
+        assert_eq!(Chunk::from_vec(buffer), None);
+    }
+
+    #[test]
+    fn from_vec_valid_uncompressed() {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend_from_slice(&2986228386u32.to_le_bytes());
+        buffer.extend_from_slice(&1u32.to_le_bytes());
+        buffer.extend_from_slice(&40u32.to_le_bytes());
+        buffer.extend_from_slice(&5u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&42u64.to_le_bytes());
+        buffer.push(0u8);
+        buffer.extend_from_slice(&[1, 2, 3, 4, 5]);
+
+        let chunk = Chunk::from_vec(buffer).unwrap();
+        assert!(chunk.guid.starts_with("00000000"));
+        assert_eq!(chunk.hash, 42);
+        assert_eq!(chunk.data, vec![1, 2, 3, 4, 5]);
+        assert_eq!(chunk.compressed, false);
+    }
+
+    #[test]
+    fn from_vec_valid_compressed() {
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&[10, 20, 30]).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend_from_slice(&2986228386u32.to_le_bytes());
+        buffer.extend_from_slice(&1u32.to_le_bytes());
+        buffer.extend_from_slice(&40u32.to_le_bytes());
+        buffer.extend_from_slice(&(compressed.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&42u64.to_le_bytes());
+        buffer.push(1u8);
+        buffer.extend_from_slice(&compressed);
+
+        let chunk = Chunk::from_vec(buffer).unwrap();
+        assert_eq!(chunk.data, vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn from_vec_version2_has_sha() {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend_from_slice(&2986228386u32.to_le_bytes());
+        buffer.extend_from_slice(&2u32.to_le_bytes());
+        buffer.extend_from_slice(&40u32.to_le_bytes());
+        buffer.extend_from_slice(&5u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&0u32.to_le_bytes());
+        buffer.extend_from_slice(&42u64.to_le_bytes());
+        buffer.push(0u8);
+        buffer.extend_from_slice(&[0xAB; 20]);
+        buffer.push(2u8);
+        buffer.extend_from_slice(&[1, 2, 3, 4, 5]);
+
+        let chunk = Chunk::from_vec(buffer).unwrap();
+        assert_eq!(chunk.sha_hash, Some(vec![0xAB; 20]));
+        assert_eq!(chunk.hash_type, Some(2));
     }
 }

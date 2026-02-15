@@ -1,18 +1,20 @@
 [package]
 name = "egs-api"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description = "Interface to the Epic Games API"
-categories = ["asynchronous"]
-keywords = ["EpicGames", "Epic", "egs"]
+categories = ["api-bindings", "asynchronous", "games"]
+keywords = ["EpicGames", "Epic", "egs", "game-store", "marketplace"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/AchetaGames/egs-api-rs"
 documentation = "https://docs.rs/egs-api/latest/egs_api/"
-edition = "2018"
+edition = "2021"
+rust-version = "1.82"
+autoexamples = false
 
 [dependencies]
-reqwest = { version = "0.12", features = ["json", "cookies", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "cookies"] }
 serde_json = "1.0"
 serde_with = "3"
 url = { version = "2.5", features = ["serde"] }
@@ -37,3 +39,56 @@ features = ["derive"]
 [dev-dependencies]
 webbrowser = "1"
 env_logger = "0.11"
+reqwest = { version = "0.12", features = ["blocking"] }
+
+[[example]]
+name = "workflow"
+path = "examples/workflow.rs"
+
+[[example]]
+name = "auth"
+path = "examples/auth.rs"
+
+[[example]]
+name = "account"
+path = "examples/account.rs"
+
+[[example]]
+name = "entitlements"
+path = "examples/entitlements.rs"
+
+[[example]]
+name = "library"
+path = "examples/library.rs"
+
+[[example]]
+name = "assets"
+path = "examples/assets.rs"
+
+[[example]]
+name = "game_token"
+path = "examples/game_token.rs"
+
+[[example]]
+name = "fab"
+path = "examples/fab.rs"
+
+[[example]]
+name = "catalog"
+path = "examples/catalog.rs"
+
+[[example]]
+name = "commerce"
+path = "examples/commerce.rs"
+
+[[example]]
+name = "status"
+path = "examples/status.rs"
+
+[[example]]
+name = "presence"
+path = "examples/presence.rs"
+
+[[example]]
+name = "client_credentials"
+path = "examples/client_credentials.rs"

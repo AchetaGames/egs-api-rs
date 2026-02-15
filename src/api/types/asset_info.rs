@@ -3,6 +3,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Detailed catalog metadata for an asset, including DLC list and release info.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,7 +56,8 @@ impl AssetInfo {
 
     /// Get list of sorted releases newest to oldest
     pub fn sorted_releases(&self) -> Option<Vec<ReleaseInfo>> {
-        if let Some(mut release_info) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
+            let mut release_info = releases.clone();
             release_info.sort_by_key(|ri| ri.date_added);
             release_info.reverse();
             Some(release_info)
@@ -66,10 +68,10 @@ impl AssetInfo {
 
     /// Get release info based on the release id
     pub fn release_info(&self, id: &str) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
             for release in releases {
-                if release.id.clone().unwrap_or_default().eq(id) {
-                    return Some(release);
+                if release.id.as_deref().unwrap_or_default() == id {
+                    return Some(release.clone());
                 }
             }
         };
@@ -78,10 +80,10 @@ impl AssetInfo {
 
     /// Get release info based on the release name
     pub fn release_name(&self, name: &str) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.release_info.clone() {
+        if let Some(releases) = &self.release_info {
             for release in releases {
-                if release.app_id.clone().unwrap_or_default().eq(name) {
-                    return Some(release);
+                if release.app_id.as_deref().unwrap_or_default() == name {
+                    return Some(release.clone());
                 }
             }
         };
@@ -95,7 +97,7 @@ impl AssetInfo {
             for info in release_infos {
                 match &info.compatible_apps {
                     None => {}
-                    Some(ca) => res.append(&mut ca.clone()),
+                    Some(ca) => res.extend(ca.iter().cloned()),
                 };
             }
             res.sort();
@@ -112,7 +114,7 @@ impl AssetInfo {
             for info in release_infos {
                 match &info.platform {
                     None => {}
-                    Some(p) => res.append(&mut p.clone()),
+                    Some(p) => res.extend(p.iter().cloned()),
                 };
             }
             res.sort();
@@ -166,6 +168,7 @@ pub struct ReleaseInfo {
     pub version_title: Option<String>,
 }
 
+/// A short-lived exchange code for game launches.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -175,8 +178,155 @@ pub struct GameToken {
     pub creating_client_id: String,
 }
 
+/// JWT token proving ownership of an asset.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OwnershipToken {
     pub token: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+
+    fn make_release(
+        id: &str,
+        app_id: &str,
+        days_ago: i64,
+        platforms: Vec<&str>,
+        compat: Vec<&str>,
+    ) -> ReleaseInfo {
+        ReleaseInfo {
+            id: Some(id.to_string()),
+            app_id: Some(app_id.to_string()),
+            date_added: Some(Utc::now() - Duration::days(days_ago)),
+            platform: if platforms.is_empty() {
+                None
+            } else {
+                Some(platforms.iter().map(|s| s.to_string()).collect())
+            },
+            compatible_apps: if compat.is_empty() {
+                None
+            } else {
+                Some(compat.iter().map(|s| s.to_string()).collect())
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn latest_release_returns_newest() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("old", "app_old", 30, vec![], vec![]),
+                make_release("new", "app_new", 1, vec![], vec![]),
+                make_release("mid", "app_mid", 15, vec![], vec![]),
+            ]),
+            ..Default::default()
+        };
+        let latest = info.latest_release().unwrap();
+        assert_eq!(latest.id, Some("new".to_string()));
+    }
+
+    #[test]
+    fn sorted_releases_order() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("old", "a", 30, vec![], vec![]),
+                make_release("new", "b", 1, vec![], vec![]),
+                make_release("mid", "c", 15, vec![], vec![]),
+            ]),
+            ..Default::default()
+        };
+        let sorted = info.sorted_releases().unwrap();
+        assert_eq!(sorted[0].id, Some("new".to_string()));
+        assert_eq!(sorted[1].id, Some("mid".to_string()));
+        assert_eq!(sorted[2].id, Some("old".to_string()));
+    }
+
+    #[test]
+    fn latest_release_none_when_no_releases() {
+        let info = AssetInfo {
+            release_info: None,
+            ..Default::default()
+        };
+        assert!(info.latest_release().is_none());
+    }
+
+    #[test]
+    fn release_info_by_id() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("r1", "a", 10, vec![], vec![]),
+                make_release("r2", "b", 5, vec![], vec![]),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            info.release_info("r2").unwrap().app_id,
+            Some("b".to_string())
+        );
+        assert!(info.release_info("nonexistent").is_none());
+    }
+
+    #[test]
+    fn release_name_lookup() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("r1", "MyApp", 10, vec![], vec![]),
+                make_release("r2", "OtherApp", 5, vec![], vec![]),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            info.release_name("OtherApp").unwrap().id,
+            Some("r2".to_string())
+        );
+        assert!(info.release_name("Missing").is_none());
+    }
+
+    #[test]
+    fn compatible_apps_deduplicates() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("r1", "a", 10, vec![], vec!["UE_5.0", "UE_4.27"]),
+                make_release("r2", "b", 5, vec![], vec!["UE_5.0", "UE_5.1"]),
+            ]),
+            ..Default::default()
+        };
+        let apps = info.compatible_apps().unwrap();
+        assert_eq!(apps, vec!["UE_4.27", "UE_5.0", "UE_5.1"]);
+    }
+
+    #[test]
+    fn compatible_apps_none_when_no_releases() {
+        let info = AssetInfo {
+            release_info: None,
+            ..Default::default()
+        };
+        assert!(info.compatible_apps().is_none());
+    }
+
+    #[test]
+    fn platforms_aggregates() {
+        let info = AssetInfo {
+            release_info: Some(vec![
+                make_release("r1", "a", 10, vec!["Windows"], vec![]),
+                make_release("r2", "b", 5, vec!["Windows", "Mac"], vec![]),
+            ]),
+            ..Default::default()
+        };
+        let plats = info.platforms().unwrap();
+        assert_eq!(plats, vec!["Mac", "Windows"]);
+    }
+
+    #[test]
+    fn platforms_none_when_no_releases() {
+        let info = AssetInfo {
+            release_info: None,
+            ..Default::default()
+        };
+        assert!(info.platforms().is_none());
+    }
 }

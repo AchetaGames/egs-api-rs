@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// A friend record with relationship status.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

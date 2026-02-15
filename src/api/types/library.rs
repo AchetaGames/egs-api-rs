@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Paginated library response containing owned asset records.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -8,6 +9,7 @@ pub struct Library {
     pub response_metadata: Option<ResponseMetadata>,
 }
 
+/// A single library entry referencing an owned asset.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

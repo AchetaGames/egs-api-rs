@@ -1,12 +1,11 @@
 use crate::api::error::EpicAPIError;
-use crate::api::types::account::{AccountData, AccountInfo};
+use crate::api::types::account::{AccountData, AccountInfo, ExternalAuth};
+use crate::api::types::entitlement::Entitlement;
 use crate::api::types::friends::Friend;
 use crate::api::EpicAPI;
-use log::{error, warn};
-use url::Url;
-use crate::api::types::entitlement::Entitlement;
 
 impl EpicAPI {
+    /// Fetch account details for the logged-in user.
     pub async fn account_details(&mut self) -> Result<AccountData, EpicAPIError> {
         let id = match &self.user_data.account_id {
             Some(id) => id,
@@ -16,36 +15,10 @@ impl EpicAPI {
             "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account/{}",
             id
         );
-        match self
-            .authorized_get_client(Url::parse(&url).unwrap())
-            .send()
-            .await
-        {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(details) => Ok(details),
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
-                        }
-                    }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
-                }
-            }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
-        }
+        self.authorized_get_json(&url).await
     }
 
+    /// Fetch display names for a list of account IDs.
     pub async fn account_ids_details(
         &mut self,
         ids: Vec<String>,
@@ -53,39 +26,14 @@ impl EpicAPI {
         if ids.is_empty() {
             return Err(EpicAPIError::InvalidParams);
         }
-        let url =
-            "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account"
-                .to_string();
-        let mut parsed_url = Url::parse(&url).unwrap();
-        let mut query = "accountId=".to_string();
-        query.push_str(&ids.join("&accountId="));
-        parsed_url.set_query(Some(&query));
-        match self.authorized_get_client(parsed_url).send().await {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(details) => Ok(details),
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
-                        }
-                    }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
-                }
-            }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
-        }
+        let url = format!(
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account?accountId={}",
+            ids.join("&accountId=")
+        );
+        self.authorized_get_json(&url).await
     }
 
+    /// Fetch the friends list, optionally including pending requests.
     pub async fn account_friends(
         &mut self,
         include_pending: bool,
@@ -95,37 +43,13 @@ impl EpicAPI {
             None => return Err(EpicAPIError::InvalidParams),
         };
         let url = format!(
-            "https://friends-public-service-prod06.ol.epicgames.com/friends/api/public/friends/{}?includePending={}", id, include_pending);
-        match self
-            .authorized_get_client(Url::parse(&url).unwrap())
-            .send()
-            .await
-        {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(details) => Ok(details),
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
-                        }
-                    }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
-                }
-            }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
-        }
+            "https://friends-public-service-prod06.ol.epicgames.com/friends/api/public/friends/{}?includePending={}",
+            id, include_pending
+        );
+        self.authorized_get_json(&url).await
     }
 
+    /// Fetch all entitlements for the logged-in user.
     pub async fn user_entitlements(&self) -> Result<Vec<Entitlement>, EpicAPIError> {
         let url = match &self.user_data.account_id {
             None => {
@@ -136,33 +60,26 @@ impl EpicAPI {
                         id)
             }
         };
-        match self
-            .authorized_get_client(Url::parse(&url).unwrap())
-            .send()
-            .await
-        {
-            Ok(response) => {
-                if response.status() == reqwest::StatusCode::OK {
-                    match response.json().await {
-                        Ok(ent) => Ok(ent),
-                        Err(e) => {
-                            error!("{:?}", e);
-                            Err(EpicAPIError::Unknown)
-                        }
-                    }
-                } else {
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap()
-                    );
-                    Err(EpicAPIError::Unknown)
-                }
-            }
-            Err(e) => {
-                error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
-            }
-        }
+        self.authorized_get_json(&url).await
+    }
+
+    /// Fetch external auth connections for an account.
+    pub async fn external_auths(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<ExternalAuth>, EpicAPIError> {
+        let url = format!(
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/public/account/{}/externalAuths",
+            account_id
+        );
+        self.authorized_get_json(&url).await
+    }
+
+    /// Fetch SSO domain list for Epic accounts.
+    pub async fn sso_domains(&self) -> Result<Vec<String>, EpicAPIError> {
+        self.authorized_get_json(
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/epicdomains/ssodomains",
+        )
+        .await
     }
 }

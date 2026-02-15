@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// An entitlement record (game, DLC, or subscription grant).
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

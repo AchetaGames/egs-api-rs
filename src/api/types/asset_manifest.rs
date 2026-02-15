@@ -1,6 +1,7 @@
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
+/// Response from the asset manifest endpoint, containing CDN download URLs.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssetManifest {
@@ -24,6 +25,7 @@ impl AssetManifest {
     }
 }
 
+/// A single build element within an asset manifest.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +37,7 @@ pub struct Element {
     pub manifests: Vec<Manifest>,
 }
 
+/// A CDN manifest URL with authentication query parameters.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

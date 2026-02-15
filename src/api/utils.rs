@@ -1,9 +1,9 @@
 use num::{BigUint, Zero};
-use std::convert::TryInto;
-use std::ops::Shl;
 use std::borrow::BorrowMut;
-use std::num::ParseIntError;
 use std::cmp::Ordering;
+use std::convert::TryInto;
+use std::num::ParseIntError;
+use std::ops::Shl;
 
 /// Convert numbers in the Download Manifest from little indian and %03d concatenated string
 pub fn blob_to_num<T: Into<String>>(str: T) -> u128 {
@@ -72,7 +72,7 @@ pub(crate) fn read_fstring(buffer: &[u8], position: &mut usize) -> Option<String
                     .as_slice(),
             ))
         }
-        Ordering::Equal => { None }
+        Ordering::Equal => None,
         Ordering::Greater => {
             *position += length as usize;
             match std::str::from_utf8(&buffer[*position - length as usize..*position - 1]) {
@@ -90,7 +90,7 @@ pub(crate) fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .collect()
 }
 
-pub(crate) fn write_fstring(string: String) -> Vec<u8> {
+pub(crate) fn write_fstring(string: &str) -> Vec<u8> {
     let mut meta: Vec<u8> = Vec::new();
     if !string.is_empty() {
         meta.append(
@@ -99,7 +99,7 @@ pub(crate) fn write_fstring(string: String) -> Vec<u8> {
                 .to_vec()
                 .borrow_mut(),
         );
-        meta.append(string.into_bytes().borrow_mut());
+        meta.append(string.as_bytes().to_vec().borrow_mut());
         meta.push(0);
     } else {
         meta.append(0u32.to_le_bytes().to_vec().borrow_mut())
@@ -110,8 +110,8 @@ pub(crate) fn write_fstring(string: String) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::api::utils::{
-        bigblob_to_num, blob_to_num, do_vecs_match, read_fstring, read_le, read_le_64,
-        read_le_64_signed, read_le_signed,
+        bigblob_to_num, blob_to_num, decode_hex, do_vecs_match, read_fstring, read_le, read_le_64,
+        read_le_64_signed, read_le_signed, write_fstring,
     };
     use num::bigint::ToBigUint;
 
@@ -194,5 +194,69 @@ mod tests {
             Some("abcd".to_string())
         );
         assert_eq!(position, 14)
+    }
+
+    #[test]
+    fn write_fstring_nonempty() {
+        let buffer = write_fstring("hello");
+        assert_eq!(buffer, vec![6, 0, 0, 0, 104, 101, 108, 108, 111, 0])
+    }
+
+    #[test]
+    fn write_fstring_empty() {
+        let buffer = write_fstring("");
+        assert_eq!(buffer, vec![0, 0, 0, 0])
+    }
+
+    #[test]
+    fn write_fstring_roundtrip() {
+        let original = "roundtrip".to_string();
+        let buffer = write_fstring(&original);
+        let mut position: usize = 0;
+        assert_eq!(read_fstring(&buffer, &mut position), Some(original));
+    }
+
+    #[test]
+    fn decode_hex_valid() {
+        assert_eq!(
+            decode_hex("48656c6c6f").unwrap(),
+            vec![72, 101, 108, 108, 111]
+        )
+    }
+
+    #[test]
+    fn decode_hex_empty() {
+        assert_eq!(decode_hex("").unwrap(), Vec::<u8>::new())
+    }
+
+    #[test]
+    fn decode_hex_invalid() {
+        assert!(decode_hex("zz").is_err())
+    }
+
+    #[test]
+    fn read_fstring_zero_length() {
+        let mut position: usize = 0;
+        let buffer = vec![0, 0, 0, 0];
+        assert_eq!(read_fstring(&buffer, &mut position), None);
+        assert_eq!(position, 4)
+    }
+
+    #[test]
+    fn read_fstring_invalid_utf8() {
+        let mut position: usize = 0;
+        let buffer = vec![3, 0, 0, 0, 255, 254, 0];
+        assert_eq!(read_fstring(&buffer, &mut position), None);
+        assert_eq!(position, 7)
+    }
+
+    #[test]
+    fn blob_to_num_empty() {
+        assert_eq!(blob_to_num(""), 0)
+    }
+
+    #[test]
+    fn blob_to_num_single() {
+        assert_eq!(blob_to_num("042"), 42)
     }
 }

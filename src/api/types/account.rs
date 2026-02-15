@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Structure that holds all account data
 #[allow(missing_docs)]
@@ -82,13 +82,13 @@ impl UserData {
     }
 
     /// Get access token
-    pub fn access_token(&self) -> Option<String> {
-        self.access_token.clone()
+    pub fn access_token(&self) -> Option<&str> {
+        self.access_token.as_deref()
     }
 
     /// Get refresh token
-    pub fn refresh_token(&self) -> Option<String> {
-        self.refresh_token.clone()
+    pub fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
     }
 
     /// Set access token
@@ -157,6 +157,7 @@ impl UserData {
     }
 }
 
+/// Account info returned by bulk account ID lookup.
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -180,6 +181,76 @@ pub struct ExternalAuth {
     #[serde(rename = "type")]
     pub type_field: String,
     pub external_auth_secondary_id: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_data_new_defaults() {
+        let ud = UserData::new();
+        assert_eq!(ud.access_token, None);
+        assert_eq!(ud.refresh_token, None);
+        assert_eq!(ud.account_id, None);
+        assert_eq!(ud.display_name, None);
+        assert_eq!(ud.expires_at, None);
+    }
+
+    #[test]
+    fn user_data_update_merges_some_fields() {
+        let mut ud = UserData::new();
+        ud.access_token = Some("old_token".to_string());
+        ud.account_id = Some("id123".to_string());
+
+        let mut new_ud = UserData::new();
+        new_ud.access_token = Some("new_token".to_string());
+        // account_id left as None
+
+        ud.update(new_ud);
+        assert_eq!(ud.access_token, Some("new_token".to_string()));
+        assert_eq!(ud.account_id, Some("id123".to_string()));
+    }
+
+    #[test]
+    fn user_data_update_all_none_preserves() {
+        let mut ud = UserData::new();
+        ud.access_token = Some("token".to_string());
+        ud.account_id = Some("id".to_string());
+        ud.display_name = Some("user".to_string());
+
+        let original = ud.clone();
+        ud.update(UserData::new());
+        assert_eq!(ud, original);
+    }
+
+    #[test]
+    fn user_data_serialization_roundtrip() {
+        let mut ud = UserData::new();
+        ud.access_token = Some("tok123".to_string());
+        ud.display_name = Some("TestUser".to_string());
+        ud.account_id = Some("acc456".to_string());
+
+        let json = serde_json::to_string(&ud).unwrap();
+        let deserialized: UserData = serde_json::from_str(&json).unwrap();
+        assert_eq!(ud, deserialized);
+    }
+
+    #[test]
+    fn user_data_access_token_getters() {
+        let mut ud = UserData::new();
+        assert_eq!(ud.access_token(), None);
+        ud.set_access_token(Some("my_token".to_string()));
+        assert_eq!(ud.access_token(), Some("my_token"));
+    }
+
+    #[test]
+    fn user_data_refresh_token_getters() {
+        let mut ud = UserData::new();
+        assert_eq!(ud.refresh_token(), None);
+        ud.set_refresh_token(Some("refresh_tok".to_string()));
+        assert_eq!(ud.refresh_token(), Some("refresh_tok"));
+    }
 }
 
 #[allow(missing_docs)]
