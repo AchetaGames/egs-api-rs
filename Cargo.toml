@@ -98,3 +98,7 @@ path = "examples/cloud_saves.rs"
 [[example]]
 name = "uplay"
 path = "examples/uplay.rs"
+
+[[example]]
+name = "compare_manifests"
+path = "examples/compare_manifests.rs"
