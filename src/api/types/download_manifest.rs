@@ -136,33 +136,32 @@ where
 }
 
 fn parse_header(buffer: &[u8]) -> Option<(Vec<u8>, usize, u32)> {
-    let mut position: usize = 0;
+    let mut reader = BinaryReader::new(buffer);
 
-    let magic = crate::api::utils::read_le(buffer, &mut position);
+    let magic = reader.read_u32()?;
     if magic != 1153351692 {
         debug!("No header magic, not a binary manifest");
         return None;
     }
-    let mut header_size = crate::api::utils::read_le(buffer, &mut position);
+    let mut header_size = reader.read_u32()?;
     debug!("Header size: {}", header_size);
-    let _size_uncompressed = crate::api::utils::read_le(buffer, &mut position);
-    let _size_compressed = crate::api::utils::read_le(buffer, &mut position);
-    position += 20;
-    let sha_hash: [u8; 20] = match buffer[position - 20..position].try_into() {
+    let _size_uncompressed = reader.read_u32()?;
+    let _size_compressed = reader.read_u32()?;
+    let sha_hash_bytes = reader.read_bytes(20)?;
+    let sha_hash: [u8; 20] = match sha_hash_bytes.try_into() {
         Ok(h) => h,
         Err(_) => {
             error!("Buffer too short for SHA hash");
             return None;
         }
     };
-    let compressed = !matches!(buffer[position], 0);
-    position += 1;
-    let _version = crate::api::utils::read_le(buffer, &mut position);
+    let compressed = !matches!(reader.read_u8()?, 0);
+    let _version = reader.read_u32()?;
 
-    let mut position_after_header = position;
+    let mut position_after_header = reader.position();
     let data = if compressed {
         debug!("Uncompressing");
-        let mut z = ZlibDecoder::new(&buffer[position..]);
+        let mut z = ZlibDecoder::new(&buffer[reader.position()..]);
         let mut data: Vec<u8> = Vec::new();
         if z.read_to_end(&mut data).is_err() {
             error!("Failed to decompress manifest data");
@@ -827,7 +826,6 @@ impl DownloadManifest {
         // TODO: Figure out what Epic puts in theirs
         for _ in &self.file_manifest_list {
             writer.write_u32(0u32);
-            // files.append(crate::api::utils::write_fstring("".to_string()).borrow_mut());
         }
 
         // File Chunks

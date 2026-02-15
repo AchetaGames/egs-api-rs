@@ -290,12 +290,29 @@ mod tests {
     }
 
     #[test]
+    fn reader_set_position() {
+        let buffer = [1u8, 2, 3];
+        let mut reader = BinaryReader::new(&buffer);
+        reader.set_position(2);
+        assert_eq!(reader.read_u8(), Some(3));
+    }
+
+    #[test]
     fn writer_u32_roundtrip() {
         let mut writer = BinaryWriter::new();
         writer.write_u32(0x04030201);
         let data = writer.into_vec();
         let mut reader = BinaryReader::new(&data);
         assert_eq!(reader.read_u32(), Some(0x04030201));
+    }
+
+    #[test]
+    fn writer_i32_roundtrip() {
+        let mut writer = BinaryWriter::new();
+        writer.write_i32(-13843);
+        let data = writer.into_vec();
+        let mut reader = BinaryReader::new(&data);
+        assert_eq!(reader.read_i32(), Some(-13843));
     }
 
     #[test]
@@ -315,5 +332,14 @@ mod tests {
         let data = writer.into_vec();
         let mut reader = BinaryReader::new(&data);
         assert_eq!(reader.read_guid(), Some(guid.to_string()));
+    }
+
+    #[test]
+    fn writer_len_as_slice() {
+        let mut writer = BinaryWriter::with_capacity(4);
+        assert_eq!(writer.len(), 0);
+        writer.write_u8(7);
+        assert_eq!(writer.len(), 1);
+        assert_eq!(writer.as_slice(), &[7u8]);
     }
 }
