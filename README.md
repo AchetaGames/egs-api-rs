@@ -40,7 +40,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-egs-api = "0.8"
+egs-api = "0.9"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
