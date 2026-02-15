@@ -33,6 +33,9 @@ Built on `reqwest` / `tokio`.
 - **Entitlements** — Query all user entitlements (games, DLC, subscriptions).
 - **Library** — Paginated library listing with optional metadata.
 - **Tokens** — Game exchange tokens and per-asset ownership tokens (JWT).
+- **Cloud Saves** — List, query, and delete cloud save files.
+- **Uplay Integration** — Query and redeem Ubisoft activation codes via
+  Epic's GraphQL store API.
 
 ## Quick Start
 
@@ -113,6 +116,8 @@ cargo run --example commerce             # Currencies, prices, billing, quick pu
 cargo run --example status               # Service status (lightswitch API)
 cargo run --example presence             # Update online presence
 cargo run --example client_credentials   # App-level auth + library state tokens
+cargo run --example cloud_saves          # Cloud save file listing + management
+cargo run --example uplay                # Ubisoft activation code queries
 ```
 
 ## API Overview
@@ -128,6 +133,7 @@ distinctions.
 | Method | Description |
 |--------|-------------|
 | `auth_code(exchange_token, authorization_code)` | Start a new session |
+| `auth_sid(sid)` | Authenticate via SID cookie (web-based exchange code flow) |
 | `auth_client_credentials()` | App-level auth (no user context) |
 | `login()` | Resume session using saved refresh token |
 | `logout()` | Invalidate current session |
@@ -149,6 +155,26 @@ distinctions.
 | `game_token()` | Short-lived exchange code for game launches |
 | `ownership_token(asset)` | JWT proving asset ownership |
 | `library_state_token_status(token_id)` | Check library state token validity |
+| `artifact_service_ticket(platform, label, namespace, item_id, app)` | Artifact service download ticket |
+| `game_manifest_by_ticket(platform, label, namespace, item_id, app, ticket)` | Game manifest via artifact service ticket |
+| `launcher_manifests(platform, label, namespace, item_id, app)` | Launcher asset manifests |
+| `delta_manifest(manifest, old_build_id, new_build_id)` | Delta/patch manifest between two builds |
+
+### Cloud Saves
+
+| Method | Description |
+|--------|-------------|
+| `cloud_save_list()` | List all cloud save files for the current user |
+| `cloud_save_query(filename)` | Query metadata for a specific cloud save file |
+| `cloud_save_delete(filename)` | Delete a cloud save file |
+
+### Uplay / Store Integration
+
+| Method | Description |
+|--------|-------------|
+| `store_get_uplay_codes(namespace, offer_id)` | Query Ubisoft activation codes for a game |
+| `store_claim_uplay_code(namespace, offer_id)` | Claim a Ubisoft activation code |
+| `store_redeem_uplay_codes(uplay_codes)` | Redeem Ubisoft activation codes |
 
 ### Fab Marketplace
 
@@ -214,9 +240,10 @@ via `custom_field(key)`.
 EpicGames (public facade, src/lib.rs)
   └── EpicAPI (internal, src/api/mod.rs)
         ├── login.rs    — OAuth: start, resume, invalidate
-        ├── egs.rs      — Assets, manifests, library, tokens
+        ├── egs.rs      — Assets, manifests, library, cloud saves, tokens
         ├── account.rs  — Account details, friends, entitlements
-        └── fab.rs      — Fab marketplace integration
+        ├── fab.rs      — Fab marketplace integration
+        └── store.rs    — Uplay/Ubisoft code redemption (GraphQL)
 ```
 
 `EpicGames` is the consumer-facing struct. It delegates to `EpicAPI` which

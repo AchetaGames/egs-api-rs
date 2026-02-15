@@ -93,9 +93,11 @@ use crate::api::{EpicAPI};
 
 use api::types::asset_info::{AssetInfo, GameToken};
 use api::types::asset_manifest::AssetManifest;
+use api::types::artifact_service::ArtifactServiceTicket;
 use api::types::billing_account::BillingAccount;
 use api::types::catalog_item::CatalogItemPage;
 use api::types::catalog_offer::CatalogOfferPage;
+use api::types::cloud_save::CloudSaveResponse;
 use api::types::currency::CurrencyPage;
 use api::types::download_manifest::DownloadManifest;
 use api::types::entitlement::Entitlement;
@@ -104,6 +106,9 @@ use api::types::presence::PresenceUpdate;
 use api::types::price::PriceResponse;
 use api::types::quick_purchase::QuickPurchaseResponse;
 use api::types::service_status::ServiceStatus;
+use api::types::uplay::{
+    UplayClaimResult, UplayCodesResult, UplayGraphQLResponse, UplayRedeemResult,
+};
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -789,6 +794,132 @@ impl EpicGames {
         self.try_fab_file_download_info(listing_id, format_id, file_id)
             .await
             .ok()
+    }
+
+    // ── Cloud Saves ──
+
+    /// List cloud save files for the logged-in user.
+    ///
+    /// If `app_name` is provided, lists saves for that specific game.
+    /// If `manifests` is true (only relevant when `app_name` is set), lists manifest files.
+    pub async fn cloud_save_list(
+        &self,
+        app_name: Option<&str>,
+        manifests: bool,
+    ) -> Result<CloudSaveResponse, EpicAPIError> {
+        self.egs.cloud_save_list(app_name, manifests).await
+    }
+
+    /// Query cloud save files by specific filenames.
+    ///
+    /// Returns metadata including read/write links for the specified files.
+    pub async fn cloud_save_query(
+        &self,
+        app_name: &str,
+        filenames: &[String],
+    ) -> Result<CloudSaveResponse, EpicAPIError> {
+        self.egs.cloud_save_query(app_name, filenames).await
+    }
+
+    /// Delete a cloud save file by its storage path.
+    pub async fn cloud_save_delete(&self, path: &str) -> Result<(), EpicAPIError> {
+        self.egs.cloud_save_delete(path).await
+    }
+
+    // ── Artifact Service & Manifests ──
+
+    /// Fetch an artifact service ticket for manifest retrieval via EOS Helper.
+    ///
+    /// The `sandbox_id` is typically the game's namespace and `artifact_id`
+    /// is the app name. Returns a signed ticket for use with
+    /// [`game_manifest_by_ticket`](Self::game_manifest_by_ticket).
+    pub async fn artifact_service_ticket(
+        &self,
+        sandbox_id: &str,
+        artifact_id: &str,
+        label: Option<&str>,
+        platform: Option<&str>,
+    ) -> Result<ArtifactServiceTicket, EpicAPIError> {
+        self.egs
+            .artifact_service_ticket(sandbox_id, artifact_id, label, platform)
+            .await
+    }
+
+    /// Fetch a game manifest using a signed artifact service ticket.
+    ///
+    /// Alternative to [`asset_manifest`](Self::asset_manifest) using ticket-based
+    /// auth from the EOS Helper service.
+    pub async fn game_manifest_by_ticket(
+        &self,
+        artifact_id: &str,
+        signed_ticket: &str,
+        label: Option<&str>,
+        platform: Option<&str>,
+    ) -> Result<AssetManifest, EpicAPIError> {
+        self.egs
+            .game_manifest_by_ticket(artifact_id, signed_ticket, label, platform)
+            .await
+    }
+
+    /// Fetch launcher manifests for self-update checks.
+    pub async fn launcher_manifests(
+        &self,
+        platform: Option<&str>,
+        label: Option<&str>,
+    ) -> Result<AssetManifest, EpicAPIError> {
+        self.egs.launcher_manifests(platform, label).await
+    }
+
+    /// Try to fetch a delta manifest for optimized patching between builds.
+    ///
+    /// Returns `None` if no delta is available or the builds are identical.
+    pub async fn delta_manifest(
+        &self,
+        base_url: &str,
+        old_build_id: &str,
+        new_build_id: &str,
+    ) -> Option<Vec<u8>> {
+        self.egs
+            .delta_manifest(base_url, old_build_id, new_build_id)
+            .await
+    }
+
+    // ── SID Auth ──
+
+    /// Authenticate via session ID (SID) from the Epic web login flow.
+    ///
+    /// Performs the multi-step web exchange: set-sid → CSRF → exchange code,
+    /// then starts a session with the resulting code. Returns `true` on success.
+    pub async fn auth_sid(&mut self, sid: &str) -> Result<bool, EpicAPIError> {
+        self.egs.auth_sid(sid).await
+    }
+
+    // ── Uplay / Ubisoft Store ──
+
+    /// Fetch Uplay codes linked to the user's Epic account.
+    pub async fn store_get_uplay_codes(
+        &self,
+    ) -> Result<UplayGraphQLResponse<UplayCodesResult>, EpicAPIError> {
+        self.egs.store_get_uplay_codes().await
+    }
+
+    /// Claim a Uplay code for a specific game.
+    pub async fn store_claim_uplay_code(
+        &self,
+        uplay_account_id: &str,
+        game_id: &str,
+    ) -> Result<UplayGraphQLResponse<UplayClaimResult>, EpicAPIError> {
+        self.egs
+            .store_claim_uplay_code(uplay_account_id, game_id)
+            .await
+    }
+
+    /// Redeem all pending Uplay codes for the user's account.
+    pub async fn store_redeem_uplay_codes(
+        &self,
+        uplay_account_id: &str,
+    ) -> Result<UplayGraphQLResponse<UplayRedeemResult>, EpicAPIError> {
+        self.egs.store_redeem_uplay_codes(uplay_account_id).await
     }
 }
 

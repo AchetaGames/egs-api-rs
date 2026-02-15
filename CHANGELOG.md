@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-15
+
+### Added
+
+- **Cloud Saves API** — `cloud_save_list`, `cloud_save_query`,
+  `cloud_save_delete` for managing Epic cloud save files.
+- **Uplay / Store Integration** — `store_get_uplay_codes`,
+  `store_claim_uplay_code`, `store_redeem_uplay_codes` for querying and
+  redeeming Ubisoft activation codes via Epic's GraphQL store API.
+- **Artifact Service** — `artifact_service_ticket` and
+  `game_manifest_by_ticket` for the two-step artifact service download flow.
+- **Launcher Manifests** — `launcher_manifests` for fetching launcher asset
+  manifests.
+- **Delta Manifests** — `delta_manifest` for fetching patch manifests between
+  two builds.
+- **SID Authentication** — `auth_sid` for authenticating via SID cookie
+  (multi-step web-based exchange code flow).
+- New type modules: `cloud_save`, `artifact_service`, `exchange_code`, `uplay`.
+- New `store` API module for GraphQL-based store operations.
+- New examples: `cloud_saves`, `uplay`.
+- Updated `assets` example with artifact service, launcher manifest, and delta
+  manifest sections.
+- Updated `auth` example with SID authentication alternative flow.
+- Updated README with new API sections, examples, and architecture diagram.
+
+### Fixed
+
+- **Entitlement pagination** — replaced single `count=5000` request with
+  proper pagination loop using `count=1000`, stopping when batch is smaller
+  than page size (matches legendary's behavior).
+- Removed dead `read_le_64_signed` function (superseded by
+  `BinaryReader::read_i64`), eliminating the last compiler warning.
+
 ## [0.9.0] - 2026-02-15
 
 ### Breaking Changes

@@ -53,11 +53,6 @@ pub(crate) fn read_le_64(buffer: &[u8], position: &mut usize) -> u64 {
     u64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
 }
 
-pub(crate) fn read_le_64_signed(buffer: &[u8], position: &mut usize) -> i64 {
-    *position += 8;
-    i64::from_le_bytes(buffer[*position - 8..*position].try_into().unwrap())
-}
-
 pub(crate) fn read_fstring(buffer: &[u8], position: &mut usize) -> Option<String> {
     let mut length = read_le_signed(buffer, position);
     match length.cmp(&0) {
@@ -111,7 +106,7 @@ pub(crate) fn write_fstring(string: &str) -> Vec<u8> {
 mod tests {
     use crate::api::utils::{
         bigblob_to_num, blob_to_num, decode_hex, do_vecs_match, read_fstring, read_le, read_le_64,
-        read_le_64_signed, read_le_signed, write_fstring,
+        read_le_signed, write_fstring,
     };
     use num::bigint::ToBigUint;
 
@@ -163,14 +158,6 @@ mod tests {
         let mut position: usize = 0;
         let buffer = vec![0, 0, 5, 3, 0, 1, 2, 3];
         assert_eq!(read_le_64(&buffer, &mut position), 216736831629492224);
-        assert_eq!(position, 8)
-    }
-
-    #[test]
-    fn read_le_64_signed_test() {
-        let mut position: usize = 0;
-        let buffer = vec![237, 201, 255, 255, 255, 255, 255, 255];
-        assert_eq!(read_le_64_signed(&buffer, &mut position), -13843);
         assert_eq!(position, 8)
     }
 

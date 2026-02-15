@@ -49,18 +49,30 @@ impl EpicAPI {
         self.authorized_get_json(&url).await
     }
 
-    /// Fetch all entitlements for the logged-in user.
+    /// Fetch all entitlements for the logged-in user, paginating internally.
     pub async fn user_entitlements(&self) -> Result<Vec<Entitlement>, EpicAPIError> {
-        let url = match &self.user_data.account_id {
-            None => {
-                return Err(EpicAPIError::InvalidCredentials);
+        let id = self
+            .user_data
+            .account_id
+            .as_deref()
+            .ok_or(EpicAPIError::InvalidCredentials)?;
+        let mut all = Vec::new();
+        let mut start: usize = 0;
+        let count: usize = 1000;
+        loop {
+            let url = format!(
+                "https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{}/entitlements?start={}&count={}",
+                id, start, count
+            );
+            let batch: Vec<Entitlement> = self.authorized_get_json(&url).await?;
+            let batch_len = batch.len();
+            all.extend(batch);
+            if batch_len < count {
+                break;
             }
-            Some(id) => {
-                format!("https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{}/entitlements?start=0&count=5000",
-                        id)
-            }
-        };
-        self.authorized_get_json(&url).await
+            start += count;
+        }
+        Ok(all)
     }
 
     /// Fetch external auth connections for an account.
