@@ -174,6 +174,17 @@ impl EpicGames {
         self.egs.user_data.update(user_details);
     }
 
+    /// Like [`auth_code`](Self::auth_code), but returns a `Result` instead of swallowing errors.
+    pub async fn try_auth_code(
+        &mut self,
+        exchange_token: Option<String>,
+        authorization_code: Option<String>,
+    ) -> Result<bool, EpicAPIError> {
+        self.egs
+            .start_session(exchange_token, authorization_code)
+            .await
+    }
+
     /// Authenticate with an authorization code or exchange token.
     ///
     /// Returns `true` on success, `false` on failure. Returns `None` on API errors.
@@ -182,8 +193,7 @@ impl EpicGames {
         exchange_token: Option<String>,
         authorization_code: Option<String>,
     ) -> bool {
-        self.egs
-            .start_session(exchange_token, authorization_code)
+        self.try_auth_code(exchange_token, authorization_code)
             .await
             .unwrap_or(false)
     }
@@ -193,9 +203,48 @@ impl EpicGames {
         self.egs.invalidate_sesion().await
     }
 
+    /// Like [`login`](Self::login), but returns a `Result` instead of swallowing errors.
+    pub async fn try_login(&mut self) -> Result<bool, EpicAPIError> {
+        if let Some(exp) = self.egs.user_data.expires_at {
+            let now = chrono::offset::Utc::now();
+            let td = exp - now;
+            if td.num_seconds() > 600 {
+                info!("Trying to re-use existing login session... ");
+                let resumed = self.egs.resume_session().await.map_err(|e| {
+                    warn!("{}", e);
+                    e
+                })?;
+                if resumed {
+                    info!("Logged in");
+                    return Ok(true);
+                }
+                return Ok(false);
+            }
+        }
+        info!("Logging in...");
+        if let Some(exp) = self.egs.user_data.refresh_expires_at {
+            let now = chrono::offset::Utc::now();
+            let td = exp - now;
+            if td.num_seconds() > 600 {
+                let started = self.egs.start_session(None, None).await.map_err(|e| {
+                    error!("{}", e);
+                    e
+                })?;
+                if started {
+                    info!("Logged in");
+                    return Ok(true);
+                }
+                return Ok(false);
+            }
+        }
+        Ok(false)
+    }
+
     /// Resume session using the saved refresh token.
     ///
     /// Returns `true` on success, `false` if the refresh token has expired or is invalid.
+    /// Unlike [`try_login`](Self::try_login), this method falls through to
+    /// refresh-token login if session resume fails.
     pub async fn login(&mut self) -> bool {
         if let Some(exp) = self.egs.user_data.expires_at {
             let now = chrono::offset::Utc::now();
@@ -238,6 +287,15 @@ impl EpicGames {
         false
     }
 
+    /// Like [`list_assets`](Self::list_assets), but returns a `Result` instead of swallowing errors.
+    pub async fn try_list_assets(
+        &mut self,
+        platform: Option<String>,
+        label: Option<String>,
+    ) -> Result<Vec<EpicAsset>, EpicAPIError> {
+        self.egs.assets(platform, label).await
+    }
+
     /// List all owned assets.
     ///
     /// Defaults to platform="Windows" and label="Live" if not specified.
@@ -247,10 +305,23 @@ impl EpicGames {
         platform: Option<String>,
         label: Option<String>,
     ) -> Vec<EpicAsset> {
-        self.egs
-            .assets(platform, label)
+        self.try_list_assets(platform, label)
             .await
             .unwrap_or_else(|_| Vec::new())
+    }
+
+    /// Like [`asset_manifest`](Self::asset_manifest), but returns a `Result` instead of swallowing errors.
+    pub async fn try_asset_manifest(
+        &mut self,
+        platform: Option<String>,
+        label: Option<String>,
+        namespace: Option<String>,
+        item_id: Option<String>,
+        app: Option<String>,
+    ) -> Result<AssetManifest, EpicAPIError> {
+        self.egs
+            .asset_manifest(platform, label, namespace, item_id, app)
+            .await
     }
 
     /// Fetch asset manifest with CDN download URLs.
@@ -265,14 +336,9 @@ impl EpicGames {
         item_id: Option<String>,
         app: Option<String>,
     ) -> Option<AssetManifest> {
-        match self
-            .egs
-            .asset_manifest(platform, label, namespace, item_id, app)
+        self.try_asset_manifest(platform, label, namespace, item_id, app)
             .await
-        {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+            .ok()
     }
 
     /// Fetch Fab asset manifest with signed distribution points.
@@ -295,81 +361,118 @@ impl EpicGames {
         }
     }
 
+    /// Like [`asset_info`](Self::asset_info), but returns a `Result` instead of swallowing errors.
+    pub async fn try_asset_info(
+        &mut self,
+        asset: &EpicAsset,
+    ) -> Result<Option<AssetInfo>, EpicAPIError> {
+        let mut info = self.egs.asset_info(asset).await?;
+        Ok(info.remove(asset.catalog_item_id.as_str()))
+    }
+
     /// Fetch catalog metadata for an asset (includes DLC tree).
     ///
     /// Returns `None` on API errors.
     pub async fn asset_info(&mut self, asset: &EpicAsset) -> Option<AssetInfo> {
-        match self.egs.asset_info(asset).await {
-            Ok(mut a) => a.remove(asset.catalog_item_id.as_str()),
-            Err(_) => None,
-        }
+        self.try_asset_info(asset).await.ok().flatten()
+    }
+
+    /// Like [`account_details`](Self::account_details), but returns a `Result` instead of swallowing errors.
+    pub async fn try_account_details(&mut self) -> Result<AccountData, EpicAPIError> {
+        self.egs.account_details().await
     }
 
     /// Fetch account details (email, display name, country, 2FA status).
     ///
     /// Returns `None` on API errors.
     pub async fn account_details(&mut self) -> Option<AccountData> {
-        match self.egs.account_details().await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_account_details().await.ok()
+    }
+
+    /// Like [`account_ids_details`](Self::account_ids_details), but returns a `Result` instead of swallowing errors.
+    pub async fn try_account_ids_details(
+        &mut self,
+        ids: Vec<String>,
+    ) -> Result<Vec<AccountInfo>, EpicAPIError> {
+        self.egs.account_ids_details(ids).await
     }
 
     /// Bulk lookup of account IDs to display names.
     ///
     /// Returns `None` on API errors.
     pub async fn account_ids_details(&mut self, ids: Vec<String>) -> Option<Vec<AccountInfo>> {
-        match self.egs.account_ids_details(ids).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_account_ids_details(ids).await.ok()
+    }
+
+    /// Like [`account_friends`](Self::account_friends), but returns a `Result` instead of swallowing errors.
+    pub async fn try_account_friends(
+        &mut self,
+        include_pending: bool,
+    ) -> Result<Vec<Friend>, EpicAPIError> {
+        self.egs.account_friends(include_pending).await
     }
 
     /// Fetch friends list (including pending requests if `include_pending` is true).
     ///
     /// Returns `None` on API errors.
     pub async fn account_friends(&mut self, include_pending: bool) -> Option<Vec<Friend>> {
-        match self.egs.account_friends(include_pending).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_account_friends(include_pending).await.ok()
+    }
+
+    /// Like [`game_token`](Self::game_token), but returns a `Result` instead of swallowing errors.
+    pub async fn try_game_token(&mut self) -> Result<GameToken, EpicAPIError> {
+        self.egs.game_token().await
     }
 
     /// Fetch a short-lived exchange code for game launches.
     ///
     /// Returns `None` on API errors.
     pub async fn game_token(&mut self) -> Option<GameToken> {
-        match self.egs.game_token().await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_game_token().await.ok()
+    }
+
+    /// Like [`ownership_token`](Self::ownership_token), but returns a `Result` instead of swallowing errors.
+    pub async fn try_ownership_token(&mut self, asset: &EpicAsset) -> Result<String, EpicAPIError> {
+        self.egs.ownership_token(asset).await.map(|a| a.token)
     }
 
     /// Fetch a JWT proving ownership of an asset.
     ///
     /// Returns `None` on API errors.
     pub async fn ownership_token(&mut self, asset: &EpicAsset) -> Option<String> {
-        match self.egs.ownership_token(asset).await {
-            Ok(a) => Some(a.token),
-            Err(_) => None,
-        }
+        self.try_ownership_token(asset).await.ok()
+    }
+
+    /// Like [`user_entitlements`](Self::user_entitlements), but returns a `Result` instead of swallowing errors.
+    pub async fn try_user_entitlements(&mut self) -> Result<Vec<Entitlement>, EpicAPIError> {
+        self.egs.user_entitlements().await
     }
 
     /// Fetch all user entitlements (games, DLC, subscriptions).
     ///
     /// Returns empty `Vec` on API errors.
     pub async fn user_entitlements(&mut self) -> Vec<Entitlement> {
-        self.egs.user_entitlements().await.unwrap_or_else(|_| Vec::new())
+        self.try_user_entitlements().await.unwrap_or_else(|_| Vec::new())
+    }
+
+    /// Like [`library_items`](Self::library_items), but returns a `Result` instead of swallowing errors.
+    pub async fn try_library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
+        self.egs.library_items(include_metadata).await
     }
 
     /// Fetch the user library with optional metadata.
     ///
     /// Paginates internally and returns all records at once. Returns `None` on API errors.
     pub async fn library_items(&mut self, include_metadata: bool) -> Option<Library> {
-        match self.egs.library_items(include_metadata).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_library_items(include_metadata).await.ok()
+    }
+
+    /// Like [`fab_library_items`](Self::fab_library_items), but returns a `Result` instead of swallowing errors.
+    pub async fn try_fab_library_items(
+        &mut self,
+        account_id: String,
+    ) -> Result<api::types::fab_library::FabLibrary, EpicAPIError> {
+        self.egs.fab_library_items(account_id).await
     }
 
     /// Fetch the user Fab library.
@@ -379,10 +482,7 @@ impl EpicGames {
         &mut self,
         account_id: String,
     ) -> Option<api::types::fab_library::FabLibrary> {
-        match self.egs.fab_library_items(account_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_fab_library_items(account_id).await.ok()
     }
 
     /// Parse download manifests from all CDN mirrors.
@@ -406,6 +506,11 @@ impl EpicGames {
             .await
     }
 
+    /// Like [`auth_client_credentials`](Self::auth_client_credentials), but returns a `Result` instead of swallowing errors.
+    pub async fn try_auth_client_credentials(&mut self) -> Result<bool, EpicAPIError> {
+        self.egs.start_client_credentials_session().await
+    }
+
     /// Authenticate with client credentials (app-level, no user context).
     ///
     /// Uses the launcher's public client ID/secret to obtain an access token
@@ -415,10 +520,12 @@ impl EpicGames {
     ///
     /// Returns `true` on success, `false` on failure.
     pub async fn auth_client_credentials(&mut self) -> bool {
-        self.egs
-            .start_client_credentials_session()
-            .await
-            .unwrap_or(false)
+        self.try_auth_client_credentials().await.unwrap_or(false)
+    }
+
+    /// Like [`external_auths`](Self::external_auths), but returns a `Result` instead of swallowing errors.
+    pub async fn try_external_auths(&self, account_id: &str) -> Result<Vec<ExternalAuth>, EpicAPIError> {
+        self.egs.external_auths(account_id).await
     }
 
     /// Fetch external auth connections linked to an account.
@@ -428,10 +535,12 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn external_auths(&self, account_id: &str) -> Option<Vec<ExternalAuth>> {
-        match self.egs.external_auths(account_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_external_auths(account_id).await.ok()
+    }
+
+    /// Like [`sso_domains`](Self::sso_domains), but returns a `Result` instead of swallowing errors.
+    pub async fn try_sso_domains(&self) -> Result<Vec<String>, EpicAPIError> {
+        self.egs.sso_domains().await
     }
 
     /// Fetch the list of SSO (Single Sign-On) domains.
@@ -441,10 +550,17 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn sso_domains(&self) -> Option<Vec<String>> {
-        match self.egs.sso_domains().await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_sso_domains().await.ok()
+    }
+
+    /// Like [`catalog_items`](Self::catalog_items), but returns a `Result` instead of swallowing errors.
+    pub async fn try_catalog_items(
+        &self,
+        namespace: &str,
+        start: i64,
+        count: i64,
+    ) -> Result<CatalogItemPage, EpicAPIError> {
+        self.egs.catalog_items(namespace, start, count).await
     }
 
     /// Fetch paginated catalog items for a namespace.
@@ -461,10 +577,17 @@ impl EpicGames {
         start: i64,
         count: i64,
     ) -> Option<CatalogItemPage> {
-        match self.egs.catalog_items(namespace, start, count).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_catalog_items(namespace, start, count).await.ok()
+    }
+
+    /// Like [`catalog_offers`](Self::catalog_offers), but returns a `Result` instead of swallowing errors.
+    pub async fn try_catalog_offers(
+        &self,
+        namespace: &str,
+        start: i64,
+        count: i64,
+    ) -> Result<CatalogOfferPage, EpicAPIError> {
+        self.egs.catalog_offers(namespace, start, count).await
     }
 
     /// Fetch paginated catalog offers for a namespace.
@@ -480,10 +603,15 @@ impl EpicGames {
         start: i64,
         count: i64,
     ) -> Option<CatalogOfferPage> {
-        match self.egs.catalog_offers(namespace, start, count).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_catalog_offers(namespace, start, count).await.ok()
+    }
+
+    /// Like [`bulk_catalog_items`](Self::bulk_catalog_items), but returns a `Result` instead of swallowing errors.
+    pub async fn try_bulk_catalog_items(
+        &self,
+        items: &[(&str, &str)],
+    ) -> Result<std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>, EpicAPIError> {
+        self.egs.bulk_catalog_items(items).await
     }
 
     /// Bulk fetch catalog items across multiple namespaces.
@@ -497,10 +625,12 @@ impl EpicGames {
         &self,
         items: &[(&str, &str)],
     ) -> Option<std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>> {
-        match self.egs.bulk_catalog_items(items).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_bulk_catalog_items(items).await.ok()
+    }
+
+    /// Like [`currencies`](Self::currencies), but returns a `Result` instead of swallowing errors.
+    pub async fn try_currencies(&self, start: i64, count: i64) -> Result<CurrencyPage, EpicAPIError> {
+        self.egs.currencies(start, count).await
     }
 
     /// Fetch available currencies from the Epic catalog.
@@ -510,10 +640,15 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn currencies(&self, start: i64, count: i64) -> Option<CurrencyPage> {
-        match self.egs.currencies(start, count).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_currencies(start, count).await.ok()
+    }
+
+    /// Like [`library_state_token_status`](Self::library_state_token_status), but returns a `Result` instead of swallowing errors.
+    pub async fn try_library_state_token_status(
+        &self,
+        token_id: &str,
+    ) -> Result<bool, EpicAPIError> {
+        self.egs.library_state_token_status(token_id).await
     }
 
     /// Check the validity of a library state token.
@@ -524,10 +659,15 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn library_state_token_status(&self, token_id: &str) -> Option<bool> {
-        match self.egs.library_state_token_status(token_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_library_state_token_status(token_id).await.ok()
+    }
+
+    /// Like [`service_status`](Self::service_status), but returns a `Result` instead of swallowing errors.
+    pub async fn try_service_status(
+        &self,
+        service_id: &str,
+    ) -> Result<Vec<ServiceStatus>, EpicAPIError> {
+        self.egs.service_status(service_id).await
     }
 
     /// Fetch service status from Epic's lightswitch API.
@@ -538,10 +678,17 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn service_status(&self, service_id: &str) -> Option<Vec<ServiceStatus>> {
-        match self.egs.service_status(service_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_service_status(service_id).await.ok()
+    }
+
+    /// Like [`offer_prices`](Self::offer_prices), but returns a `Result` instead of swallowing errors.
+    pub async fn try_offer_prices(
+        &self,
+        namespace: &str,
+        offer_ids: &[String],
+        country: &str,
+    ) -> Result<PriceResponse, EpicAPIError> {
+        self.egs.offer_prices(namespace, offer_ids, country).await
     }
 
     /// Fetch offer prices from Epic's price engine.
@@ -557,10 +704,16 @@ impl EpicGames {
         offer_ids: &[String],
         country: &str,
     ) -> Option<PriceResponse> {
-        match self.egs.offer_prices(namespace, offer_ids, country).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_offer_prices(namespace, offer_ids, country).await.ok()
+    }
+
+    /// Like [`quick_purchase`](Self::quick_purchase), but returns a `Result` instead of swallowing errors.
+    pub async fn try_quick_purchase(
+        &self,
+        namespace: &str,
+        offer_id: &str,
+    ) -> Result<QuickPurchaseResponse, EpicAPIError> {
+        self.egs.quick_purchase(namespace, offer_id).await
     }
 
     /// Execute a quick purchase (typically for free game claims).
@@ -575,10 +728,12 @@ impl EpicGames {
         namespace: &str,
         offer_id: &str,
     ) -> Option<QuickPurchaseResponse> {
-        match self.egs.quick_purchase(namespace, offer_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_quick_purchase(namespace, offer_id).await.ok()
+    }
+
+    /// Like [`billing_account`](Self::billing_account), but returns a `Result` instead of swallowing errors.
+    pub async fn try_billing_account(&self) -> Result<BillingAccount, EpicAPIError> {
+        self.egs.billing_account().await
     }
 
     /// Fetch the default billing account for payment processing.
@@ -588,10 +743,7 @@ impl EpicGames {
     ///
     /// Returns `None` on API errors.
     pub async fn billing_account(&self) -> Option<BillingAccount> {
-        match self.egs.billing_account().await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_billing_account().await.ok()
     }
 
     /// Update the user's presence status.
@@ -608,6 +760,18 @@ impl EpicGames {
         self.egs.update_presence(session_id, body).await
     }
 
+    /// Like [`fab_file_download_info`](Self::fab_file_download_info), but returns a `Result` instead of swallowing errors.
+    pub async fn try_fab_file_download_info(
+        &self,
+        listing_id: &str,
+        format_id: &str,
+        file_id: &str,
+    ) -> Result<DownloadInfo, EpicAPIError> {
+        self.egs
+            .fab_file_download_info(listing_id, format_id, file_id)
+            .await
+    }
+
     /// Fetch download info for a specific file within a Fab listing.
     ///
     /// Returns signed [`DownloadInfo`] for a single file identified by
@@ -622,10 +786,9 @@ impl EpicGames {
         format_id: &str,
         file_id: &str,
     ) -> Option<DownloadInfo> {
-        match self.egs.fab_file_download_info(listing_id, format_id, file_id).await {
-            Ok(a) => Some(a),
-            Err(_) => None,
-        }
+        self.try_fab_file_download_info(listing_id, format_id, file_id)
+            .await
+            .ok()
     }
 }
 
