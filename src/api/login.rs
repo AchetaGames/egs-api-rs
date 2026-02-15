@@ -52,7 +52,7 @@ impl EpicAPI {
             Ok(response) => self.handle_login_response(response).await,
             Err(e) => {
                 error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
+                Err(EpicAPIError::NetworkError(e))
             }
         }
     }
@@ -67,7 +67,7 @@ impl EpicAPI {
             Ok(data) => data,
             Err(e) => {
                 error!("{:?}", e);
-                return Err(EpicAPIError::Unknown);
+                return Err(EpicAPIError::DeserializationError(format!("{}", e)));
             }
         };
 
@@ -91,7 +91,7 @@ impl EpicAPI {
             }
             Err(e) => {
                 error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
+                Err(EpicAPIError::NetworkError(e))
             }
         }
     }
@@ -117,7 +117,7 @@ impl EpicAPI {
             Ok(response) => self.handle_login_response(response).await,
             Err(e) => {
                 error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
+                Err(EpicAPIError::NetworkError(e))
             }
         }
     }

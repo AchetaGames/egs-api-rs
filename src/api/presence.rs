@@ -24,19 +24,17 @@ impl EpicAPI {
             .await
             .map_err(|e| {
                 log::error!("{:?}", e);
-                EpicAPIError::Unknown
+                EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK
             || response.status() == reqwest::StatusCode::NO_CONTENT
         {
             Ok(())
         } else {
-            log::warn!(
-                "{} result: {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
-            );
-            Err(EpicAPIError::Unknown)
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            log::warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
         }
     }
 }

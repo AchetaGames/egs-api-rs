@@ -39,24 +39,22 @@ impl EpicAPI {
                         Err(e) => {
                             error!("{:?}", e);
                             debug!("{}", text);
-                            Err(EpicAPIError::Unknown)
+                            Err(EpicAPIError::DeserializationError(format!("{}", e)))
                         }
                     }
                 } else if response.status() == reqwest::StatusCode::FORBIDDEN {
                     Err(EpicAPIError::FabTimeout)
                 } else {
                     debug!("{:?}", response.headers());
-                    warn!(
-                        "{} result: {}",
-                        response.status(),
-                        response.text().await.unwrap_or_default()
-                    );
-                    Err(EpicAPIError::Unknown)
+                    let status = response.status();
+                    let body = response.text().await.unwrap_or_default();
+                    warn!("{} result: {}", status, body);
+                    Err(EpicAPIError::HttpError { status, body })
                 }
             }
             Err(e) => {
                 error!("{:?}", e);
-                Err(EpicAPIError::Unknown)
+                Err(EpicAPIError::NetworkError(e))
             }
         }
     }
@@ -70,18 +68,20 @@ impl EpicAPI {
         match download_info.get_distribution_point_by_base_url(distribution_point_url) {
             None => {
                 error!("Distribution point not found");
-                Err(EpicAPIError::Unknown)
+                Err(EpicAPIError::InvalidParams)
             }
             Some(point) => {
                 if point.signature_expiration < time::OffsetDateTime::now_utc() {
                     error!("Expired signature");
-                    Err(EpicAPIError::Unknown)
+                    Err(EpicAPIError::InvalidParams)
                 } else {
                     let data = self.get_bytes(&point.manifest_url).await?;
                     match DownloadManifest::parse(data) {
                         None => {
                             error!("Unable to parse the Download Manifest");
-                            Err(EpicAPIError::Unknown)
+                            Err(EpicAPIError::DeserializationError(
+                                "Unable to parse the Download Manifest".to_string(),
+                            ))
                         }
                         Some(man) => Ok(man),
                     }
