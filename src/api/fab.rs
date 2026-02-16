@@ -295,4 +295,41 @@ impl EpicAPI {
         };
         self.get_json(&url).await
     }
+
+    /// Fetch available license types. Public endpoint.
+    pub async fn fab_licenses(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabLicenseType>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/taxonomy/licenses").await
+    }
+
+    /// Fetch asset format groups. Public endpoint.
+    pub async fn fab_format_groups(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabFormatGroup>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/taxonomy/asset-format-groups").await
+    }
+
+    /// Fetch tag groups with nested tags. Public endpoint.
+    pub async fn fab_tag_groups(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabTagGroup>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/tags/groups").await
+    }
+
+    /// Fetch available UE versions. Public endpoint.
+    pub async fn fab_ue_versions(
+        &self,
+    ) -> Result<Vec<String>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/unreal-engine/versions").await
+    }
+
+    /// Fetch channel info by slug. Public endpoint.
+    pub async fn fab_channel(
+        &self,
+        slug: &str,
+    ) -> Result<crate::api::types::fab_taxonomy::FabChannel, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/channels/{}", slug);
+        self.get_json(&url).await
+    }
 }

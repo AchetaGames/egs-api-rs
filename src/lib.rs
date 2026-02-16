@@ -112,6 +112,7 @@ use api::types::uplay::{
 use api::types::cosmos;
 use api::types::engine_blob;
 use api::types::fab_search;
+use api::types::fab_taxonomy;
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -1156,6 +1157,67 @@ impl EpicGames {
         cursor: Option<&str>,
     ) -> Result<fab_search::FabReviewsResponse, EpicAPIError> {
         self.egs.fab_listing_reviews(uid, sort_by, cursor).await
+    }
+
+    // --- Fab Taxonomy ---
+
+    /// Fetch available license types. Returns `None` on error.
+    pub async fn fab_licenses(&self) -> Option<Vec<fab_taxonomy::FabLicenseType>> {
+        self.egs.fab_licenses().await.ok()
+    }
+
+    /// Fetch available license types. Returns full `Result`.
+    pub async fn try_fab_licenses(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabLicenseType>, EpicAPIError> {
+        self.egs.fab_licenses().await
+    }
+
+    /// Fetch asset format groups. Returns `None` on error.
+    pub async fn fab_format_groups(&self) -> Option<Vec<fab_taxonomy::FabFormatGroup>> {
+        self.egs.fab_format_groups().await.ok()
+    }
+
+    /// Fetch asset format groups. Returns full `Result`.
+    pub async fn try_fab_format_groups(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabFormatGroup>, EpicAPIError> {
+        self.egs.fab_format_groups().await
+    }
+
+    /// Fetch tag groups with nested tags. Returns `None` on error.
+    pub async fn fab_tag_groups(&self) -> Option<Vec<fab_taxonomy::FabTagGroup>> {
+        self.egs.fab_tag_groups().await.ok()
+    }
+
+    /// Fetch tag groups with nested tags. Returns full `Result`.
+    pub async fn try_fab_tag_groups(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabTagGroup>, EpicAPIError> {
+        self.egs.fab_tag_groups().await
+    }
+
+    /// Fetch available UE versions. Returns `None` on error.
+    pub async fn fab_ue_versions(&self) -> Option<Vec<String>> {
+        self.egs.fab_ue_versions().await.ok()
+    }
+
+    /// Fetch available UE versions. Returns full `Result`.
+    pub async fn try_fab_ue_versions(&self) -> Result<Vec<String>, EpicAPIError> {
+        self.egs.fab_ue_versions().await
+    }
+
+    /// Fetch channel info by slug. Returns `None` on error.
+    pub async fn fab_channel(&self, slug: &str) -> Option<fab_taxonomy::FabChannel> {
+        self.egs.fab_channel(slug).await.ok()
+    }
+
+    /// Fetch channel info by slug. Returns full `Result`.
+    pub async fn try_fab_channel(
+        &self,
+        slug: &str,
+    ) -> Result<fab_taxonomy::FabChannel, EpicAPIError> {
+        self.egs.fab_channel(slug).await
     }
 
     // --- Cosmos Policy/Communication ---
