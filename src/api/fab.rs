@@ -332,4 +332,56 @@ impl EpicAPI {
         let url = format!("https://www.fab.com/i/channels/{}", slug);
         self.get_json(&url).await
     }
+
+    /// Search library entitlements with filters and aggregations.
+    /// Uses the browser-path Fab API. Requires Fab session cookies for full results.
+    pub async fn fab_library_entitlements(
+        &self,
+        params: &crate::api::types::fab_entitlement::FabEntitlementSearchParams,
+    ) -> Result<crate::api::types::fab_entitlement::FabEntitlementResults, EpicAPIError> {
+        let mut query_parts = Vec::new();
+        if let Some(ref sort_by) = params.sort_by {
+            query_parts.push(format!("sort_by={}", sort_by));
+        }
+        if let Some(ref cursor) = params.cursor {
+            query_parts.push(format!("cursor={}", cursor));
+        }
+        if let Some(ref listing_types) = params.listing_types {
+            query_parts.push(format!("listing_types={}", listing_types));
+        }
+        if let Some(ref categories) = params.categories {
+            query_parts.push(format!("categories={}", categories));
+        }
+        if let Some(ref tags) = params.tags {
+            query_parts.push(format!("tags={}", tags));
+        }
+        if let Some(ref licenses) = params.licenses {
+            query_parts.push(format!("licenses={}", licenses));
+        }
+        if let Some(ref asset_formats) = params.asset_formats {
+            query_parts.push(format!("asset_formats={}", asset_formats));
+        }
+        if let Some(ref source) = params.source {
+            query_parts.push(format!("source={}", source));
+        }
+        if let Some(ref aggregate_on) = params.aggregate_on {
+            query_parts.push(format!("aggregate_on={}", aggregate_on));
+        }
+        if let Some(count) = params.count {
+            query_parts.push(format!("count={}", count));
+        }
+        if let Some(ref added_since) = params.added_since {
+            query_parts.push(format!("added_since={}", added_since));
+        }
+
+        let url = if query_parts.is_empty() {
+            "https://www.fab.com/i/library/entitlements/search".to_string()
+        } else {
+            format!(
+                "https://www.fab.com/i/library/entitlements/search?{}",
+                query_parts.join("&")
+            )
+        };
+        self.authorized_get_json(&url).await
+    }
 }

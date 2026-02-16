@@ -113,6 +113,7 @@ use api::types::cosmos;
 use api::types::engine_blob;
 use api::types::fab_search;
 use api::types::fab_taxonomy;
+use api::types::fab_entitlement;
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -1218,6 +1219,24 @@ impl EpicGames {
         slug: &str,
     ) -> Result<fab_taxonomy::FabChannel, EpicAPIError> {
         self.egs.fab_channel(slug).await
+    }
+
+    // --- Fab Library Entitlements ---
+
+    /// Search library entitlements. Returns `None` on error.
+    pub async fn fab_library_entitlements(
+        &self,
+        params: &fab_entitlement::FabEntitlementSearchParams,
+    ) -> Option<fab_entitlement::FabEntitlementResults> {
+        self.egs.fab_library_entitlements(params).await.ok()
+    }
+
+    /// Search library entitlements. Returns full `Result`.
+    pub async fn try_fab_library_entitlements(
+        &self,
+        params: &fab_entitlement::FabEntitlementSearchParams,
+    ) -> Result<fab_entitlement::FabEntitlementResults, EpicAPIError> {
+        self.egs.fab_library_entitlements(params).await
     }
 
     // --- Cosmos Policy/Communication ---
