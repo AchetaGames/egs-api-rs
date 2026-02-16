@@ -66,3 +66,12 @@ pub mod uplay;
 
 /// Exchange Code structures
 pub mod exchange_code;
+
+/// Cosmos API types (session, account, EULA)
+pub mod cosmos;
+
+/// Engine version blob types
+pub mod engine_blob;
+
+/// Fab search and browse types
+pub mod fab_search;

@@ -1,6 +1,6 @@
 [package]
 name = "egs-api"
-version = "0.10.2"
+version = "0.11.0"
 authors = ["Milan Šťastný <milan@acheta.games>"]
 description = "Interface to the Epic Games API"
 categories = ["api-bindings", "asynchronous", "games"]
@@ -98,6 +98,10 @@ path = "examples/cloud_saves.rs"
 [[example]]
 name = "uplay"
 path = "examples/uplay.rs"
+
+[[example]]
+name = "cosmos"
+path = "examples/cosmos.rs"
 
 [[example]]
 name = "compare_manifests"

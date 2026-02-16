@@ -147,4 +147,114 @@ impl EpicAPI {
         );
         self.authorized_get_json(&url).await
     }
+
+    /// Search Fab listings. Public endpoint — no auth required.
+    ///
+    /// Use `FabSearchParams` to specify filters, sorting, and pagination.
+    pub async fn fab_search(
+        &self,
+        params: &crate::api::types::fab_search::FabSearchParams,
+    ) -> Result<crate::api::types::fab_search::FabSearchResults, EpicAPIError> {
+        let mut url = "https://www.fab.com/i/listings/search?".to_string();
+        let mut query_parts = Vec::new();
+
+        if let Some(ref channels) = params.channels {
+            query_parts.push(format!("channels={}", channels));
+        }
+        if let Some(ref listing_types) = params.listing_types {
+            query_parts.push(format!("listing_types={}", listing_types));
+        }
+        if let Some(ref categories) = params.categories {
+            query_parts.push(format!("categories={}", categories));
+        }
+        if let Some(ref sort_by) = params.sort_by {
+            query_parts.push(format!("sort_by={}", sort_by));
+        }
+        if let Some(count) = params.count {
+            query_parts.push(format!("count={}", count));
+        }
+        if let Some(ref cursor) = params.cursor {
+            query_parts.push(format!("cursor={}", cursor));
+        }
+        if let Some(ref aggregate_on) = params.aggregate_on {
+            query_parts.push(format!("aggregate_on={}", aggregate_on));
+        }
+        if let Some(ref in_filter) = params.in_filter {
+            query_parts.push(format!("in={}", in_filter));
+        }
+        if let Some(is_discounted) = params.is_discounted {
+            if is_discounted {
+                query_parts.push("is_discounted=true".to_string());
+            }
+        }
+
+        url.push_str(&query_parts.join("&"));
+        self.get_json(&url).await
+    }
+
+    /// Get full listing detail. Public endpoint — no auth required.
+    pub async fn fab_listing(
+        &self,
+        uid: &str,
+    ) -> Result<crate::api::types::fab_search::FabListingDetail, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/listings/{}", uid);
+        self.get_json(&url).await
+    }
+
+    /// Get UE-specific format details for a listing. Public endpoint.
+    pub async fn fab_listing_ue_formats(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<crate::api::types::fab_search::FabListingUeFormat>, EpicAPIError> {
+        let url = format!(
+            "https://www.fab.com/i/listings/{}/asset-formats/unreal-engine",
+            uid
+        );
+        self.get_json(&url).await
+    }
+
+    /// Get user's listing state (ownership, wishlist, review). Requires Fab session.
+    pub async fn fab_listing_state(
+        &self,
+        uid: &str,
+    ) -> Result<crate::api::types::fab_search::FabListingState, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/users/me/listings-states/{}", uid);
+        self.authorized_get_json(&url).await
+    }
+
+    /// Bulk check listing states for multiple IDs. Requires Fab session.
+    pub async fn fab_listing_states_bulk(
+        &self,
+        listing_ids: &[&str],
+    ) -> Result<Vec<crate::api::types::fab_search::FabListingState>, EpicAPIError> {
+        let ids = listing_ids.join(",");
+        let url = format!(
+            "https://www.fab.com/i/users/me/listings-states?listing_ids={}",
+            ids
+        );
+        self.authorized_get_json(&url).await
+    }
+
+    /// Bulk fetch pricing for multiple offer IDs. Public endpoint.
+    pub async fn fab_bulk_prices(
+        &self,
+        offer_ids: &[&str],
+    ) -> Result<Vec<crate::api::types::fab_search::FabPriceInfo>, EpicAPIError> {
+        let ids = offer_ids
+            .iter()
+            .map(|id| format!("offer_ids={}", id))
+            .collect::<Vec<_>>()
+            .join("&");
+        let url = format!("https://www.fab.com/i/listings/prices-infos?{}", ids);
+        self.get_json(&url).await
+    }
+
+    /// Get listing ownership info. Requires Fab session.
+    pub async fn fab_listing_ownership(
+        &self,
+        uid: &str,
+    ) -> Result<crate::api::types::fab_search::FabOwnership, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/listings/{}/ownership", uid);
+        self.authorized_get_json(&url).await
+    }
 }
