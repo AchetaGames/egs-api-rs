@@ -1239,6 +1239,25 @@ impl EpicGames {
         self.egs.fab_library_entitlements(params).await
     }
 
+    // --- Fab Session ---
+
+    /// Initialize Fab CSRF token. Sets cookies on the shared HTTP client.
+    pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
+        self.egs.fab_csrf().await
+    }
+
+    /// Fetch Fab user context. Returns `None` on error.
+    pub async fn fab_user_context(&self) -> Option<fab_search::FabUserContext> {
+        self.egs.fab_user_context().await.ok()
+    }
+
+    /// Fetch Fab user context. Returns full `Result`.
+    pub async fn try_fab_user_context(
+        &self,
+    ) -> Result<fab_search::FabUserContext, EpicAPIError> {
+        self.egs.fab_user_context().await
+    }
+
     // --- Cosmos Policy/Communication ---
 
     /// Check Age of Digital Consent policy. Returns `None` on error.

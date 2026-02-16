@@ -468,6 +468,15 @@ mod tests {
             Some("https://www.fab.com/sellers/PloxTools")
         );
     }
+
+    #[test]
+    fn deserialize_user_context() {
+        let json = r#"{"country": "US", "currency": "USD", "features": {"darkMode": true}}"#;
+        let ctx: FabUserContext = serde_json::from_str(json).unwrap();
+        assert_eq!(ctx.country, Some("US".to_string()));
+        assert_eq!(ctx.currency, Some("USD".to_string()));
+        assert!(ctx.features.is_some());
+    }
 }
 
 /// Paginated reviews response from `GET /i/store/listings/{uid}/reviews`.
@@ -498,6 +507,15 @@ pub struct FabReview {
 #[serde(rename_all = "camelCase")]
 pub struct FabReviewUser {
     pub display_name: Option<String>,
+}
+
+/// Fab user context from `GET /i/users/context`.
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FabUserContext {
+    pub country: Option<String>,
+    pub currency: Option<String>,
+    pub features: Option<serde_json::Value>,
 }
 
 /// Search filter parameters for `fab_search()`.

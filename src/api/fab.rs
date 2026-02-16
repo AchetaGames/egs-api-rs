@@ -384,4 +384,29 @@ impl EpicAPI {
         };
         self.authorized_get_json(&url).await
     }
+
+    /// Initialize Fab CSRF token. Sets `fab_csrftoken` cookie on the client.
+    pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
+        let parsed_url =
+            url::Url::parse("https://www.fab.com/i/csrf").map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self.client.get(parsed_url).send().await.map_err(|e| {
+            error!("{:?}", e);
+            EpicAPIError::NetworkError(e)
+        })?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    /// Fetch Fab user context (country, currency, feature flags). Works with just CSRF token.
+    pub async fn fab_user_context(
+        &self,
+    ) -> Result<crate::api::types::fab_search::FabUserContext, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/users/context").await
+    }
 }
