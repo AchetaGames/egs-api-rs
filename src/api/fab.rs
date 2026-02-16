@@ -158,6 +158,9 @@ impl EpicAPI {
         let mut url = "https://www.fab.com/i/listings/search?".to_string();
         let mut query_parts = Vec::new();
 
+        if let Some(ref q) = params.q {
+            query_parts.push(format!("q={}", q));
+        }
         if let Some(ref channels) = params.channels {
             query_parts.push(format!("channels={}", channels));
         }
@@ -256,5 +259,40 @@ impl EpicAPI {
     ) -> Result<crate::api::types::fab_search::FabOwnership, EpicAPIError> {
         let url = format!("https://www.fab.com/i/listings/{}/ownership", uid);
         self.authorized_get_json(&url).await
+    }
+
+    /// Get pricing for a specific listing. Public endpoint.
+    pub async fn fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<crate::api::types::fab_search::FabPriceInfo>, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/listings/{}/prices-infos", uid);
+        self.get_json(&url).await
+    }
+
+    /// Get reviews for a listing. Public endpoint.
+    pub async fn fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Result<crate::api::types::fab_search::FabReviewsResponse, EpicAPIError> {
+        let mut query_parts = Vec::new();
+        if let Some(sort) = sort_by {
+            query_parts.push(format!("sort_by={}", sort));
+        }
+        if let Some(c) = cursor {
+            query_parts.push(format!("cursor={}", c));
+        }
+        let url = if query_parts.is_empty() {
+            format!("https://www.fab.com/i/store/listings/{}/reviews", uid)
+        } else {
+            format!(
+                "https://www.fab.com/i/store/listings/{}/reviews?{}",
+                uid,
+                query_parts.join("&")
+            )
+        };
+        self.get_json(&url).await
     }
 }

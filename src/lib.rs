@@ -1122,6 +1122,42 @@ impl EpicGames {
         self.egs.fab_listing_ownership(uid).await
     }
 
+    /// Get pricing for a specific listing. Returns `None` on error.
+    pub async fn fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Option<Vec<fab_search::FabPriceInfo>> {
+        self.egs.fab_listing_prices(uid).await.ok()
+    }
+
+    /// Get pricing for a specific listing. Returns full `Result`.
+    pub async fn try_fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<fab_search::FabPriceInfo>, EpicAPIError> {
+        self.egs.fab_listing_prices(uid).await
+    }
+
+    /// Get reviews for a listing. Returns `None` on error.
+    pub async fn fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Option<fab_search::FabReviewsResponse> {
+        self.egs.fab_listing_reviews(uid, sort_by, cursor).await.ok()
+    }
+
+    /// Get reviews for a listing. Returns full `Result`.
+    pub async fn try_fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Result<fab_search::FabReviewsResponse, EpicAPIError> {
+        self.egs.fab_listing_reviews(uid, sort_by, cursor).await
+    }
+
     // --- Cosmos Policy/Communication ---
 
     /// Check Age of Digital Consent policy. Returns `None` on error.
