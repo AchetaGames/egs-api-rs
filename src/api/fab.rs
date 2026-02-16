@@ -158,6 +158,9 @@ impl EpicAPI {
         let mut url = "https://www.fab.com/i/listings/search?".to_string();
         let mut query_parts = Vec::new();
 
+        if let Some(ref q) = params.q {
+            query_parts.push(format!("q={}", q));
+        }
         if let Some(ref channels) = params.channels {
             query_parts.push(format!("channels={}", channels));
         }
@@ -256,5 +259,154 @@ impl EpicAPI {
     ) -> Result<crate::api::types::fab_search::FabOwnership, EpicAPIError> {
         let url = format!("https://www.fab.com/i/listings/{}/ownership", uid);
         self.authorized_get_json(&url).await
+    }
+
+    /// Get pricing for a specific listing. Public endpoint.
+    pub async fn fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<crate::api::types::fab_search::FabPriceInfo>, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/listings/{}/prices-infos", uid);
+        self.get_json(&url).await
+    }
+
+    /// Get reviews for a listing. Public endpoint.
+    pub async fn fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Result<crate::api::types::fab_search::FabReviewsResponse, EpicAPIError> {
+        let mut query_parts = Vec::new();
+        if let Some(sort) = sort_by {
+            query_parts.push(format!("sort_by={}", sort));
+        }
+        if let Some(c) = cursor {
+            query_parts.push(format!("cursor={}", c));
+        }
+        let url = if query_parts.is_empty() {
+            format!("https://www.fab.com/i/store/listings/{}/reviews", uid)
+        } else {
+            format!(
+                "https://www.fab.com/i/store/listings/{}/reviews?{}",
+                uid,
+                query_parts.join("&")
+            )
+        };
+        self.get_json(&url).await
+    }
+
+    /// Fetch available license types. Public endpoint.
+    pub async fn fab_licenses(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabLicenseType>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/taxonomy/licenses").await
+    }
+
+    /// Fetch asset format groups. Public endpoint.
+    pub async fn fab_format_groups(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabFormatGroup>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/taxonomy/asset-format-groups").await
+    }
+
+    /// Fetch tag groups with nested tags. Public endpoint.
+    pub async fn fab_tag_groups(
+        &self,
+    ) -> Result<Vec<crate::api::types::fab_taxonomy::FabTagGroup>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/tags/groups").await
+    }
+
+    /// Fetch available UE versions. Public endpoint.
+    pub async fn fab_ue_versions(
+        &self,
+    ) -> Result<Vec<String>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/unreal-engine/versions").await
+    }
+
+    /// Fetch channel info by slug. Public endpoint.
+    pub async fn fab_channel(
+        &self,
+        slug: &str,
+    ) -> Result<crate::api::types::fab_taxonomy::FabChannel, EpicAPIError> {
+        let url = format!("https://www.fab.com/i/channels/{}", slug);
+        self.get_json(&url).await
+    }
+
+    /// Search library entitlements with filters and aggregations.
+    /// Uses the browser-path Fab API. Requires Fab session cookies for full results.
+    pub async fn fab_library_entitlements(
+        &self,
+        params: &crate::api::types::fab_entitlement::FabEntitlementSearchParams,
+    ) -> Result<crate::api::types::fab_entitlement::FabEntitlementResults, EpicAPIError> {
+        let mut query_parts = Vec::new();
+        if let Some(ref sort_by) = params.sort_by {
+            query_parts.push(format!("sort_by={}", sort_by));
+        }
+        if let Some(ref cursor) = params.cursor {
+            query_parts.push(format!("cursor={}", cursor));
+        }
+        if let Some(ref listing_types) = params.listing_types {
+            query_parts.push(format!("listing_types={}", listing_types));
+        }
+        if let Some(ref categories) = params.categories {
+            query_parts.push(format!("categories={}", categories));
+        }
+        if let Some(ref tags) = params.tags {
+            query_parts.push(format!("tags={}", tags));
+        }
+        if let Some(ref licenses) = params.licenses {
+            query_parts.push(format!("licenses={}", licenses));
+        }
+        if let Some(ref asset_formats) = params.asset_formats {
+            query_parts.push(format!("asset_formats={}", asset_formats));
+        }
+        if let Some(ref source) = params.source {
+            query_parts.push(format!("source={}", source));
+        }
+        if let Some(ref aggregate_on) = params.aggregate_on {
+            query_parts.push(format!("aggregate_on={}", aggregate_on));
+        }
+        if let Some(count) = params.count {
+            query_parts.push(format!("count={}", count));
+        }
+        if let Some(ref added_since) = params.added_since {
+            query_parts.push(format!("added_since={}", added_since));
+        }
+
+        let url = if query_parts.is_empty() {
+            "https://www.fab.com/i/library/entitlements/search".to_string()
+        } else {
+            format!(
+                "https://www.fab.com/i/library/entitlements/search?{}",
+                query_parts.join("&")
+            )
+        };
+        self.authorized_get_json(&url).await
+    }
+
+    /// Initialize Fab CSRF token. Sets `fab_csrftoken` cookie on the client.
+    pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
+        let parsed_url =
+            url::Url::parse("https://www.fab.com/i/csrf").map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self.client.get(parsed_url).send().await.map_err(|e| {
+            error!("{:?}", e);
+            EpicAPIError::NetworkError(e)
+        })?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    /// Fetch Fab user context (country, currency, feature flags). Works with just CSRF token.
+    pub async fn fab_user_context(
+        &self,
+    ) -> Result<crate::api::types::fab_search::FabUserContext, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/users/context").await
     }
 }

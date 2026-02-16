@@ -112,6 +112,9 @@ use api::types::uplay::{
 use api::types::cosmos;
 use api::types::engine_blob;
 use api::types::fab_search;
+use api::types::fab_taxonomy;
+use api::types::fab_entitlement;
+use api::types::account::TokenVerification;
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -1122,6 +1125,140 @@ impl EpicGames {
         self.egs.fab_listing_ownership(uid).await
     }
 
+    /// Get pricing for a specific listing. Returns `None` on error.
+    pub async fn fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Option<Vec<fab_search::FabPriceInfo>> {
+        self.egs.fab_listing_prices(uid).await.ok()
+    }
+
+    /// Get pricing for a specific listing. Returns full `Result`.
+    pub async fn try_fab_listing_prices(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<fab_search::FabPriceInfo>, EpicAPIError> {
+        self.egs.fab_listing_prices(uid).await
+    }
+
+    /// Get reviews for a listing. Returns `None` on error.
+    pub async fn fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Option<fab_search::FabReviewsResponse> {
+        self.egs.fab_listing_reviews(uid, sort_by, cursor).await.ok()
+    }
+
+    /// Get reviews for a listing. Returns full `Result`.
+    pub async fn try_fab_listing_reviews(
+        &self,
+        uid: &str,
+        sort_by: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Result<fab_search::FabReviewsResponse, EpicAPIError> {
+        self.egs.fab_listing_reviews(uid, sort_by, cursor).await
+    }
+
+    // --- Fab Taxonomy ---
+
+    /// Fetch available license types. Returns `None` on error.
+    pub async fn fab_licenses(&self) -> Option<Vec<fab_taxonomy::FabLicenseType>> {
+        self.egs.fab_licenses().await.ok()
+    }
+
+    /// Fetch available license types. Returns full `Result`.
+    pub async fn try_fab_licenses(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabLicenseType>, EpicAPIError> {
+        self.egs.fab_licenses().await
+    }
+
+    /// Fetch asset format groups. Returns `None` on error.
+    pub async fn fab_format_groups(&self) -> Option<Vec<fab_taxonomy::FabFormatGroup>> {
+        self.egs.fab_format_groups().await.ok()
+    }
+
+    /// Fetch asset format groups. Returns full `Result`.
+    pub async fn try_fab_format_groups(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabFormatGroup>, EpicAPIError> {
+        self.egs.fab_format_groups().await
+    }
+
+    /// Fetch tag groups with nested tags. Returns `None` on error.
+    pub async fn fab_tag_groups(&self) -> Option<Vec<fab_taxonomy::FabTagGroup>> {
+        self.egs.fab_tag_groups().await.ok()
+    }
+
+    /// Fetch tag groups with nested tags. Returns full `Result`.
+    pub async fn try_fab_tag_groups(
+        &self,
+    ) -> Result<Vec<fab_taxonomy::FabTagGroup>, EpicAPIError> {
+        self.egs.fab_tag_groups().await
+    }
+
+    /// Fetch available UE versions. Returns `None` on error.
+    pub async fn fab_ue_versions(&self) -> Option<Vec<String>> {
+        self.egs.fab_ue_versions().await.ok()
+    }
+
+    /// Fetch available UE versions. Returns full `Result`.
+    pub async fn try_fab_ue_versions(&self) -> Result<Vec<String>, EpicAPIError> {
+        self.egs.fab_ue_versions().await
+    }
+
+    /// Fetch channel info by slug. Returns `None` on error.
+    pub async fn fab_channel(&self, slug: &str) -> Option<fab_taxonomy::FabChannel> {
+        self.egs.fab_channel(slug).await.ok()
+    }
+
+    /// Fetch channel info by slug. Returns full `Result`.
+    pub async fn try_fab_channel(
+        &self,
+        slug: &str,
+    ) -> Result<fab_taxonomy::FabChannel, EpicAPIError> {
+        self.egs.fab_channel(slug).await
+    }
+
+    // --- Fab Library Entitlements ---
+
+    /// Search library entitlements. Returns `None` on error.
+    pub async fn fab_library_entitlements(
+        &self,
+        params: &fab_entitlement::FabEntitlementSearchParams,
+    ) -> Option<fab_entitlement::FabEntitlementResults> {
+        self.egs.fab_library_entitlements(params).await.ok()
+    }
+
+    /// Search library entitlements. Returns full `Result`.
+    pub async fn try_fab_library_entitlements(
+        &self,
+        params: &fab_entitlement::FabEntitlementSearchParams,
+    ) -> Result<fab_entitlement::FabEntitlementResults, EpicAPIError> {
+        self.egs.fab_library_entitlements(params).await
+    }
+
+    // --- Fab Session ---
+
+    /// Initialize Fab CSRF token. Sets cookies on the shared HTTP client.
+    pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
+        self.egs.fab_csrf().await
+    }
+
+    /// Fetch Fab user context. Returns `None` on error.
+    pub async fn fab_user_context(&self) -> Option<fab_search::FabUserContext> {
+        self.egs.fab_user_context().await.ok()
+    }
+
+    /// Fetch Fab user context. Returns full `Result`.
+    pub async fn try_fab_user_context(
+        &self,
+    ) -> Result<fab_search::FabUserContext, EpicAPIError> {
+        self.egs.fab_user_context().await
+    }
+
     // --- Cosmos Policy/Communication ---
 
     /// Check Age of Digital Consent policy. Returns `None` on error.
@@ -1150,6 +1287,45 @@ impl EpicGames {
         setting: &str,
     ) -> Result<cosmos::CosmosCommOptIn, EpicAPIError> {
         self.egs.cosmos_comm_opt_in(setting).await
+    }
+
+    /// Search unrealengine.com content. Requires an active Cosmos session.
+    ///
+    /// Returns `None` on any error.
+    pub async fn cosmos_search(
+        &self,
+        query: &str,
+        slug: Option<&str>,
+        locale: Option<&str>,
+        filter: Option<&str>,
+    ) -> Option<cosmos::CosmosSearchResults> {
+        self.try_cosmos_search(query, slug, locale, filter).await.ok()
+    }
+
+    /// Like [`cosmos_search`](Self::cosmos_search), but returns a `Result` instead of swallowing errors.
+    pub async fn try_cosmos_search(
+        &self,
+        query: &str,
+        slug: Option<&str>,
+        locale: Option<&str>,
+        filter: Option<&str>,
+    ) -> Result<cosmos::CosmosSearchResults, EpicAPIError> {
+        self.egs.cosmos_search(query, slug, locale, filter).await
+    }
+
+    /// Verify the current OAuth token and get account/session info.
+    ///
+    /// Returns `None` on any error.
+    pub async fn verify_access_token(&self, include_perms: bool) -> Option<TokenVerification> {
+        self.try_verify_access_token(include_perms).await.ok()
+    }
+
+    /// Like [`verify_access_token`](Self::verify_access_token), but returns a `Result` instead of swallowing errors.
+    pub async fn try_verify_access_token(
+        &self,
+        include_perms: bool,
+    ) -> Result<TokenVerification, EpicAPIError> {
+        self.egs.verify_token(include_perms).await
     }
 }
 

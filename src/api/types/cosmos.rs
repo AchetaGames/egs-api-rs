@@ -68,6 +68,32 @@ pub struct CosmosCommOptIn {
     pub setting_value: bool,
 }
 
+/// Response from Cosmos search on unrealengine.com.
+///
+/// The response shape is derived from JS bundle analysis and may need
+/// adjustment once verified against the live API.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CosmosSearchResults {
+    pub results: Option<Vec<CosmosSearchResult>>,
+    pub count: Option<u64>,
+}
+
+/// A single search result from Cosmos.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CosmosSearchResult {
+    pub title: Option<String>,
+    pub slug: Option<String>,
+    pub description: Option<String>,
+    pub url: Option<String>,
+    pub category: Option<String>,
+    pub date: Option<String>,
+    pub image: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,5 +143,24 @@ mod tests {
         let json = r#"{"settingValue":false}"#;
         let opt: CosmosCommOptIn = serde_json::from_str(json).unwrap();
         assert!(!opt.setting_value);
+    }
+
+    #[test]
+    fn deserialize_cosmos_search_results() {
+        let json = r#"{"results":[{"title":"Getting Started","slug":"getting-started","description":"Learn how to use UE","url":"/learn/getting-started","category":"tutorials","date":"2025-01-15","image":"https://cdn.example.com/img.png"}],"count":1}"#;
+        let results: CosmosSearchResults = serde_json::from_str(json).unwrap();
+        assert_eq!(results.count, Some(1));
+        let items = results.results.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, Some("Getting Started".to_string()));
+        assert_eq!(items[0].category, Some("tutorials".to_string()));
+    }
+
+    #[test]
+    fn deserialize_cosmos_search_empty() {
+        let json = r#"{"results":[],"count":0}"#;
+        let results: CosmosSearchResults = serde_json::from_str(json).unwrap();
+        assert_eq!(results.count, Some(0));
+        assert!(results.results.unwrap().is_empty());
     }
 }

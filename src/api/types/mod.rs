@@ -75,3 +75,9 @@ pub mod engine_blob;
 
 /// Fab search and browse types
 pub mod fab_search;
+
+/// Fab taxonomy and metadata types
+pub mod fab_taxonomy;
+
+/// Fab library entitlement types
+pub mod fab_entitlement;

@@ -251,6 +251,34 @@ mod tests {
         ud.set_refresh_token(Some("refresh_tok".to_string()));
         assert_eq!(ud.refresh_token(), Some("refresh_tok"));
     }
+
+    #[test]
+    fn deserialize_token_verification() {
+        let json = r#"{"token":"abc123","sessionId":"sess1","tokenType":"bearer","clientId":"34a02cf8f4414e29b15921876da36f9a","internalClient":true,"clientService":"launcher","accountId":"8645b4947bbc4c0092a8b7236df169d1","expiresIn":28800,"expiresAt":"2026-02-16T20:00:00.000Z","authMethod":"exchange_code","displayName":"TestUser","app":"launcher","inAppId":"8645b4947bbc4c0092a8b7236df169d1","deviceId":"device1","perms":[{"resource":"account:public:account","action":1}]}"#;
+        let v: TokenVerification = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            v.account_id,
+            Some("8645b4947bbc4c0092a8b7236df169d1".to_string())
+        );
+        assert_eq!(v.display_name, Some("TestUser".to_string()));
+        assert_eq!(v.auth_method, Some("exchange_code".to_string()));
+        let perms = v.perms.unwrap();
+        assert_eq!(perms.len(), 1);
+        assert_eq!(
+            perms[0].resource,
+            Some("account:public:account".to_string())
+        );
+        assert_eq!(perms[0].action, Some(1));
+    }
+
+    #[test]
+    fn deserialize_token_verification_no_perms() {
+        let json = r#"{"token":"abc","sessionId":"s1","tokenType":"bearer","clientId":"cid","internalClient":false,"clientService":"launcher","accountId":"aid","expiresIn":100,"expiresAt":"2026-01-01T00:00:00.000Z","authMethod":"refresh_token","displayName":"User","app":"launcher","inAppId":null,"deviceId":null,"perms":null}"#;
+        let v: TokenVerification = serde_json::from_str(json).unwrap();
+        assert_eq!(v.account_id, Some("aid".to_string()));
+        assert!(v.perms.is_none());
+        assert!(v.in_app_id.is_none());
+    }
 }
 
 #[allow(missing_docs)]
@@ -260,4 +288,38 @@ pub struct AuthId {
     pub id: String,
     #[serde(rename = "type")]
     pub type_field: String,
+}
+
+/// Response from `GET /account/api/oauth/verify` — token introspection.
+///
+/// Returns details about the current OAuth token including account info,
+/// client info, expiration times, and optionally granted permissions.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenVerification {
+    pub token: Option<String>,
+    pub session_id: Option<String>,
+    pub token_type: Option<String>,
+    pub client_id: Option<String>,
+    pub internal_client: Option<bool>,
+    pub client_service: Option<String>,
+    pub account_id: Option<String>,
+    pub expires_in: Option<i64>,
+    pub expires_at: Option<String>,
+    pub auth_method: Option<String>,
+    pub display_name: Option<String>,
+    pub app: Option<String>,
+    pub in_app_id: Option<String>,
+    pub device_id: Option<String>,
+    pub perms: Option<Vec<TokenPermission>>,
+}
+
+/// A single permission entry from token verification.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenPermission {
+    pub resource: Option<String>,
+    pub action: Option<u32>,
 }

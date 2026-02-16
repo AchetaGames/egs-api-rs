@@ -20,9 +20,41 @@ async fn main() {
         std::process::exit(1);
     }
 
+    // --- Text search with q parameter (Phase 1 enhancement) ---
+
+    println!("=== Fab Text Search (q=\"landscape\") ===\n");
+
+    let text_params = FabSearchParams {
+        q: Some("landscape".to_string()),
+        channels: Some("unreal-engine".to_string()),
+        count: Some(3),
+        ..Default::default()
+    };
+
+    match egs.fab_search(&text_params).await {
+        Some(results) => {
+            println!(
+                "Found {} results for \"landscape\":",
+                results.count.unwrap_or(0)
+            );
+            for listing in &results.results {
+                let title = listing.title.as_deref().unwrap_or("(untitled)");
+                let seller = listing
+                    .user
+                    .as_ref()
+                    .and_then(|u| u.seller_name.as_deref())
+                    .unwrap_or("unknown");
+                println!("  {} — by {}", title, seller);
+            }
+        }
+        None => {
+            eprintln!("Text search failed");
+        }
+    }
+
     // --- Search (public, no auth required) ---
 
-    println!("=== Fab Search (UE plugins, newest first) ===\n");
+    println!("\n=== Fab Search (UE plugins, newest first) ===\n");
 
     let params = FabSearchParams {
         channels: Some("unreal-engine".to_string()),
@@ -193,6 +225,82 @@ async fn main() {
                     }
                     None => {
                         println!("  Could not fetch ownership info");
+                    }
+                }
+
+                // --- Pricing ---
+
+                println!("\n=== Listing Prices ===\n");
+
+                match egs.fab_listing_prices(&first.uid).await {
+                    Some(prices) => {
+                        if prices.is_empty() {
+                            println!("  No pricing info (may be free)");
+                        } else {
+                            for price in &prices {
+                                let currency = price
+                                    .currency_code
+                                    .as_deref()
+                                    .unwrap_or("?");
+                                let amount = price
+                                    .price
+                                    .map(|p| format!("{:.2}", p))
+                                    .unwrap_or_else(|| "N/A".to_string());
+                                let discount = price.discount.unwrap_or(0.0);
+                                if discount > 0.0 {
+                                    println!(
+                                        "  {} {} (discount: {:.0}%)",
+                                        currency, amount, discount
+                                    );
+                                } else {
+                                    println!("  {} {}", currency, amount);
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        println!("  Could not fetch pricing info");
+                    }
+                }
+
+                // --- Reviews ---
+
+                println!("\n=== Listing Reviews ===\n");
+
+                match egs.fab_listing_reviews(&first.uid, Some("-createdAt"), None).await {
+                    Some(reviews_resp) => {
+                        println!(
+                            "  Total reviews: {}",
+                            reviews_resp.count.unwrap_or(0)
+                        );
+                        for review in reviews_resp.results.iter().take(3) {
+                            let author = review
+                                .user
+                                .as_ref()
+                                .and_then(|u| u.display_name.as_deref())
+                                .unwrap_or("anonymous");
+                            let rating = review
+                                .rating
+                                .map(|r| format!("{}/5", r))
+                                .unwrap_or_else(|| "?".to_string());
+                            let title = review
+                                .title
+                                .as_deref()
+                                .unwrap_or("(no title)");
+                            println!("  [{}] {} — {}", rating, title, author);
+                            if let Some(ref content) = review.content {
+                                let preview: String =
+                                    content.chars().take(80).collect();
+                                if content.len() > 80 {
+                                    println!("    {}...", preview);
+                                } else {
+                                    println!("    {}", preview);
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        println!("  Could not fetch reviews");
                     }
                 }
             }
