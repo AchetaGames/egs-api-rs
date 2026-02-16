@@ -1,5 +1,5 @@
 use crate::api::error::EpicAPIError;
-use crate::api::types::account::{AccountData, AccountInfo, ExternalAuth};
+use crate::api::types::account::{AccountData, AccountInfo, ExternalAuth, TokenVerification};
 use crate::api::types::entitlement::Entitlement;
 use crate::api::types::friends::Friend;
 use crate::api::EpicAPI;
@@ -93,5 +93,17 @@ impl EpicAPI {
             "https://account-public-service-prod03.ol.epicgames.com/account/api/epicdomains/ssodomains",
         )
         .await
+    }
+
+    /// Verify the current OAuth token and get account info with permissions.
+    pub async fn verify_token(
+        &self,
+        include_perms: bool,
+    ) -> Result<TokenVerification, EpicAPIError> {
+        let url = format!(
+            "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify?includePerms={}",
+            include_perms
+        );
+        self.authorized_get_json(&url).await
     }
 }

@@ -1,6 +1,7 @@
 use crate::api::error::EpicAPIError;
 use crate::api::types::cosmos::{
-    CosmosAccount, CosmosAuthResponse, CosmosCommOptIn, CosmosEulaResponse, CosmosPolicyAodc,
+    CosmosAccount, CosmosAuthResponse, CosmosCommOptIn, CosmosEulaResponse, CosmosSearchResults,
+    CosmosPolicyAodc,
 };
 use crate::api::types::engine_blob::EngineBlobsResponse;
 use crate::api::EpicAPI;
@@ -329,6 +330,54 @@ impl EpicAPI {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             warn!("blobs/{} failed: {} {}", platform, status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    /// Search unrealengine.com content. Requires an active Cosmos session.
+    pub async fn cosmos_search(
+        &self,
+        query: &str,
+        slug: Option<&str>,
+        locale: Option<&str>,
+        filter: Option<&str>,
+    ) -> Result<CosmosSearchResults, EpicAPIError> {
+        let mut url = format!(
+            "https://www.unrealengine.com/api/cosmos/search?query={}",
+            query
+        );
+        if let Some(s) = slug {
+            url.push_str(&format!("&slug={}", s));
+        }
+        if let Some(l) = locale {
+            url.push_str(&format!("&locale={}", l));
+        }
+        if let Some(f) = filter {
+            url.push_str(&format!("&filter={}", f));
+        }
+        let response = self
+            .client
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed cosmos search: {:?}", e);
+                EpicAPIError::NetworkError(e)
+            })?;
+
+        if response.status().is_success() {
+            response
+                .json::<CosmosSearchResults>()
+                .await
+                .map_err(|e| {
+                    error!("Failed to parse cosmos search response: {:?}", e);
+                    EpicAPIError::DeserializationError(format!("{}", e))
+                })
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("cosmos/search failed: {} {}", status, body);
             Err(EpicAPIError::HttpError { status, body })
         }
     }

@@ -114,6 +114,7 @@ use api::types::engine_blob;
 use api::types::fab_search;
 use api::types::fab_taxonomy;
 use api::types::fab_entitlement;
+use api::types::account::TokenVerification;
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -1286,6 +1287,45 @@ impl EpicGames {
         setting: &str,
     ) -> Result<cosmos::CosmosCommOptIn, EpicAPIError> {
         self.egs.cosmos_comm_opt_in(setting).await
+    }
+
+    /// Search unrealengine.com content. Requires an active Cosmos session.
+    ///
+    /// Returns `None` on any error.
+    pub async fn cosmos_search(
+        &self,
+        query: &str,
+        slug: Option<&str>,
+        locale: Option<&str>,
+        filter: Option<&str>,
+    ) -> Option<cosmos::CosmosSearchResults> {
+        self.try_cosmos_search(query, slug, locale, filter).await.ok()
+    }
+
+    /// Like [`cosmos_search`](Self::cosmos_search), but returns a `Result` instead of swallowing errors.
+    pub async fn try_cosmos_search(
+        &self,
+        query: &str,
+        slug: Option<&str>,
+        locale: Option<&str>,
+        filter: Option<&str>,
+    ) -> Result<cosmos::CosmosSearchResults, EpicAPIError> {
+        self.egs.cosmos_search(query, slug, locale, filter).await
+    }
+
+    /// Verify the current OAuth token and get account/session info.
+    ///
+    /// Returns `None` on any error.
+    pub async fn verify_access_token(&self, include_perms: bool) -> Option<TokenVerification> {
+        self.try_verify_access_token(include_perms).await.ok()
+    }
+
+    /// Like [`verify_access_token`](Self::verify_access_token), but returns a `Result` instead of swallowing errors.
+    pub async fn try_verify_access_token(
+        &self,
+        include_perms: bool,
+    ) -> Result<TokenVerification, EpicAPIError> {
+        self.egs.verify_token(include_perms).await
     }
 }
 
