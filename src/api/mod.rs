@@ -46,6 +46,9 @@ pub mod presence;
 /// Uplay/Ubisoft Store Methods
 pub mod store;
 
+/// Cosmos session and API methods (unrealengine.com cookie-based)
+pub mod cosmos;
+
 #[derive(Debug, Clone)]
 pub(crate) struct EpicAPI {
     client: Client,
@@ -206,6 +209,29 @@ impl EpicAPI {
             })?;
         if response.status() == reqwest::StatusCode::OK {
             response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    /// Send an unauthenticated GET request and deserialize the JSON response
+    pub(crate) async fn get_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+    ) -> Result<T, EpicAPIError> {
+        let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self.client.get(parsed_url).send().await.map_err(|e| {
+            error!("{:?}", e);
+            EpicAPIError::NetworkError(e)
+        })?;
+        if response.status() == reqwest::StatusCode::OK {
+            response.json::<T>().await.map_err(|e| {
                 error!("{:?}", e);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })

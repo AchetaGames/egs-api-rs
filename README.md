@@ -27,7 +27,11 @@ Built on `reqwest` / `tokio`.
   Exposes file lists, chunk hashes, and custom fields needed to reconstruct
   downloads.
 - **Fab Marketplace** — List Fab library items, fetch Fab asset manifests with
-  signed distribution points, and download Fab manifests.
+  signed distribution points, and download Fab manifests. Search and browse
+  listings with filtering, view listing details, UE format specs, ownership,
+  and pricing.
+- **Cosmos / Unreal Engine** — Cookie-based session for unrealengine.com.
+  EULA management, account details, and engine version blob listing.
 - **Account** — Account details, bulk account ID lookup, friends list
   (including pending requests).
 - **Entitlements** — Query all user entitlements (games, DLC, subscriptions).
@@ -110,7 +114,8 @@ cargo run --example entitlements         # List all entitlements
 cargo run --example library              # Paginated library listing
 cargo run --example assets               # Full pipeline: list → info → manifest → download manifest
 cargo run --example game_token           # Exchange code + ownership token
-cargo run --example fab                  # Fab library → asset manifest → download manifest
+cargo run --example fab                  # Fab search, browse, listing detail, library, downloads
+cargo run --example cosmos               # Cosmos session, EULA, account, engine versions
 cargo run --example catalog              # Catalog items, offers, bulk lookup
 cargo run --example commerce             # Currencies, prices, billing, quick purchase
 cargo run --example status               # Service status (lightswitch API)
@@ -184,6 +189,26 @@ distinctions.
 | `fab_asset_manifest(artifact_id, namespace, asset_id, platform)` | Signed download info with distribution points |
 | `fab_download_manifest(download_info, distribution_point_url)` | Parse download manifest from a specific CDN |
 | `fab_file_download_info(listing_id, format_id, file_id)` | Download info for a specific Fab file |
+| `fab_search(params)` | Search/browse listings with filters, sorting, pagination |
+| `fab_listing(uid)` | Full listing detail (title, seller, category, ratings) |
+| `fab_listing_ue_formats(uid)` | UE-specific format specs (engine versions, platforms) |
+| `fab_listing_state(uid)` | Ownership, wishlist, and review state for a listing |
+| `fab_listing_states_bulk(listing_ids)` | Bulk check listing states |
+| `fab_bulk_prices(offer_ids)` | Bulk fetch pricing for multiple offers |
+| `fab_listing_ownership(uid)` | Detailed ownership/license info for a listing |
+
+### Cosmos / Unreal Engine
+
+| Method | Description |
+|--------|-------------|
+| `cosmos_session_setup(exchange_code)` | Set up a Cosmos cookie session from an exchange code |
+| `cosmos_auth_upgrade()` | Upgrade bearer token to Cosmos session |
+| `cosmos_eula_check(eula_id, locale)` | Check if a EULA has been accepted |
+| `cosmos_eula_accept(eula_id, locale, version)` | Accept a EULA |
+| `cosmos_account()` | Cosmos account details |
+| `cosmos_policy_aodc()` | Age of Digital Consent policy status |
+| `cosmos_comm_opt_in(setting)` | Communication opt-in status |
+| `engine_versions(platform)` | Engine version download blobs for a platform |
 
 ### Account & Social
 
@@ -242,7 +267,8 @@ EpicGames (public facade, src/lib.rs)
         ├── login.rs    — OAuth: start, resume, invalidate
         ├── egs.rs      — Assets, manifests, library, cloud saves, tokens
         ├── account.rs  — Account details, friends, entitlements
-        ├── fab.rs      — Fab marketplace integration
+        ├── fab.rs      — Fab marketplace: library, downloads, search, browse
+        ├── cosmos.rs   — Cosmos session, EULA, account, engine versions
         └── store.rs    — Uplay/Ubisoft code redemption (GraphQL)
 ```
 

@@ -109,6 +109,9 @@ use api::types::service_status::ServiceStatus;
 use api::types::uplay::{
     UplayClaimResult, UplayCodesResult, UplayGraphQLResponse, UplayRedeemResult,
 };
+use api::types::cosmos;
+use api::types::engine_blob;
+use api::types::fab_search;
 use log::{error, info, warn};
 use crate::api::error::EpicAPIError;
 
@@ -920,6 +923,233 @@ impl EpicGames {
         uplay_account_id: &str,
     ) -> Result<UplayGraphQLResponse<UplayRedeemResult>, EpicAPIError> {
         self.egs.store_redeem_uplay_codes(uplay_account_id).await
+    }
+
+    // --- Cosmos Session ---
+
+    /// Set up a Cosmos cookie session from an exchange code.
+    /// Typically called with a code from `game_token()`.
+    pub async fn cosmos_session_setup(
+        &self,
+        exchange_code: &str,
+    ) -> Result<cosmos::CosmosAuthResponse, EpicAPIError> {
+        self.egs.cosmos_session_setup(exchange_code).await
+    }
+
+    /// Upgrade bearer token to Cosmos session (step 5 of session setup).
+    pub async fn cosmos_auth_upgrade(
+        &self,
+    ) -> Result<cosmos::CosmosAuthResponse, EpicAPIError> {
+        self.egs.cosmos_auth_upgrade().await
+    }
+
+    /// Check if a EULA has been accepted. Returns `None` on error.
+    pub async fn cosmos_eula_check(&self, eula_id: &str, locale: &str) -> Option<bool> {
+        self.egs
+            .cosmos_eula_check(eula_id, locale)
+            .await
+            .ok()
+            .map(|r| r.accepted)
+    }
+
+    /// Check if a EULA has been accepted. Returns full `Result`.
+    pub async fn try_cosmos_eula_check(
+        &self,
+        eula_id: &str,
+        locale: &str,
+    ) -> Result<cosmos::CosmosEulaResponse, EpicAPIError> {
+        self.egs.cosmos_eula_check(eula_id, locale).await
+    }
+
+    /// Accept a EULA. Returns `None` on error.
+    pub async fn cosmos_eula_accept(
+        &self,
+        eula_id: &str,
+        locale: &str,
+        version: u32,
+    ) -> Option<bool> {
+        self.egs
+            .cosmos_eula_accept(eula_id, locale, version)
+            .await
+            .ok()
+            .map(|r| r.accepted)
+    }
+
+    /// Accept a EULA. Returns full `Result`.
+    pub async fn try_cosmos_eula_accept(
+        &self,
+        eula_id: &str,
+        locale: &str,
+        version: u32,
+    ) -> Result<cosmos::CosmosEulaResponse, EpicAPIError> {
+        self.egs.cosmos_eula_accept(eula_id, locale, version).await
+    }
+
+    /// Get Cosmos account details. Returns `None` on error.
+    pub async fn cosmos_account(&self) -> Option<cosmos::CosmosAccount> {
+        self.egs.cosmos_account().await.ok()
+    }
+
+    /// Get Cosmos account details. Returns full `Result`.
+    pub async fn try_cosmos_account(&self) -> Result<cosmos::CosmosAccount, EpicAPIError> {
+        self.egs.cosmos_account().await
+    }
+
+    /// Fetch engine version download blobs for a platform. Returns `None` on error.
+    pub async fn engine_versions(
+        &self,
+        platform: &str,
+    ) -> Option<engine_blob::EngineBlobsResponse> {
+        self.egs.engine_versions(platform).await.ok()
+    }
+
+    /// Fetch engine version download blobs. Returns full `Result`.
+    pub async fn try_engine_versions(
+        &self,
+        platform: &str,
+    ) -> Result<engine_blob::EngineBlobsResponse, EpicAPIError> {
+        self.egs.engine_versions(platform).await
+    }
+
+    // --- Fab Search/Browse ---
+
+    /// Search Fab listings. Returns `None` on error.
+    pub async fn fab_search(
+        &self,
+        params: &fab_search::FabSearchParams,
+    ) -> Option<fab_search::FabSearchResults> {
+        self.egs.fab_search(params).await.ok()
+    }
+
+    /// Search Fab listings. Returns full `Result`.
+    pub async fn try_fab_search(
+        &self,
+        params: &fab_search::FabSearchParams,
+    ) -> Result<fab_search::FabSearchResults, EpicAPIError> {
+        self.egs.fab_search(params).await
+    }
+
+    /// Get full listing detail. Returns `None` on error.
+    pub async fn fab_listing(&self, uid: &str) -> Option<fab_search::FabListingDetail> {
+        self.egs.fab_listing(uid).await.ok()
+    }
+
+    /// Get full listing detail. Returns full `Result`.
+    pub async fn try_fab_listing(
+        &self,
+        uid: &str,
+    ) -> Result<fab_search::FabListingDetail, EpicAPIError> {
+        self.egs.fab_listing(uid).await
+    }
+
+    /// Get UE-specific format details for a listing. Returns `None` on error.
+    pub async fn fab_listing_ue_formats(
+        &self,
+        uid: &str,
+    ) -> Option<Vec<fab_search::FabListingUeFormat>> {
+        self.egs.fab_listing_ue_formats(uid).await.ok()
+    }
+
+    /// Get UE-specific format details. Returns full `Result`.
+    pub async fn try_fab_listing_ue_formats(
+        &self,
+        uid: &str,
+    ) -> Result<Vec<fab_search::FabListingUeFormat>, EpicAPIError> {
+        self.egs.fab_listing_ue_formats(uid).await
+    }
+
+    /// Get listing state (ownership, wishlist, review). Returns `None` on error.
+    pub async fn fab_listing_state(
+        &self,
+        uid: &str,
+    ) -> Option<fab_search::FabListingState> {
+        self.egs.fab_listing_state(uid).await.ok()
+    }
+
+    /// Get listing state. Returns full `Result`.
+    pub async fn try_fab_listing_state(
+        &self,
+        uid: &str,
+    ) -> Result<fab_search::FabListingState, EpicAPIError> {
+        self.egs.fab_listing_state(uid).await
+    }
+
+    /// Bulk check listing states. Returns `None` on error.
+    pub async fn fab_listing_states_bulk(
+        &self,
+        listing_ids: &[&str],
+    ) -> Option<Vec<fab_search::FabListingState>> {
+        self.egs.fab_listing_states_bulk(listing_ids).await.ok()
+    }
+
+    /// Bulk check listing states. Returns full `Result`.
+    pub async fn try_fab_listing_states_bulk(
+        &self,
+        listing_ids: &[&str],
+    ) -> Result<Vec<fab_search::FabListingState>, EpicAPIError> {
+        self.egs.fab_listing_states_bulk(listing_ids).await
+    }
+
+    /// Bulk fetch pricing for multiple offer IDs. Returns `None` on error.
+    pub async fn fab_bulk_prices(
+        &self,
+        offer_ids: &[&str],
+    ) -> Option<Vec<fab_search::FabPriceInfo>> {
+        self.egs.fab_bulk_prices(offer_ids).await.ok()
+    }
+
+    /// Bulk fetch pricing. Returns full `Result`.
+    pub async fn try_fab_bulk_prices(
+        &self,
+        offer_ids: &[&str],
+    ) -> Result<Vec<fab_search::FabPriceInfo>, EpicAPIError> {
+        self.egs.fab_bulk_prices(offer_ids).await
+    }
+
+    /// Get listing ownership info. Returns `None` on error.
+    pub async fn fab_listing_ownership(
+        &self,
+        uid: &str,
+    ) -> Option<fab_search::FabOwnership> {
+        self.egs.fab_listing_ownership(uid).await.ok()
+    }
+
+    /// Get listing ownership info. Returns full `Result`.
+    pub async fn try_fab_listing_ownership(
+        &self,
+        uid: &str,
+    ) -> Result<fab_search::FabOwnership, EpicAPIError> {
+        self.egs.fab_listing_ownership(uid).await
+    }
+
+    // --- Cosmos Policy/Communication ---
+
+    /// Check Age of Digital Consent policy. Returns `None` on error.
+    pub async fn cosmos_policy_aodc(&self) -> Option<cosmos::CosmosPolicyAodc> {
+        self.egs.cosmos_policy_aodc().await.ok()
+    }
+
+    /// Check Age of Digital Consent policy. Returns full `Result`.
+    pub async fn try_cosmos_policy_aodc(
+        &self,
+    ) -> Result<cosmos::CosmosPolicyAodc, EpicAPIError> {
+        self.egs.cosmos_policy_aodc().await
+    }
+
+    /// Check communication opt-in status. Returns `None` on error.
+    pub async fn cosmos_comm_opt_in(
+        &self,
+        setting: &str,
+    ) -> Option<cosmos::CosmosCommOptIn> {
+        self.egs.cosmos_comm_opt_in(setting).await.ok()
+    }
+
+    /// Check communication opt-in status. Returns full `Result`.
+    pub async fn try_cosmos_comm_opt_in(
+        &self,
+        setting: &str,
+    ) -> Result<cosmos::CosmosCommOptIn, EpicAPIError> {
+        self.egs.cosmos_comm_opt_in(setting).await
     }
 }
 
