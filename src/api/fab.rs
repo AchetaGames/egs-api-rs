@@ -190,6 +190,17 @@ impl EpicAPI {
                 query_parts.push("is_discounted=true".to_string());
             }
         }
+        if let Some(is_free) = params.is_free {
+            if is_free {
+                query_parts.push("is_free=1".to_string());
+            }
+        }
+        if let Some(pct) = params.min_discount_percentage {
+            query_parts.push(format!("min_discount_percentage={}", pct));
+        }
+        if let Some(ref seller) = params.seller {
+            query_parts.push(format!("seller={}", seller));
+        }
 
         url.push_str(&query_parts.join("&"));
         self.get_json(&url).await
@@ -242,7 +253,7 @@ impl EpicAPI {
     pub async fn fab_bulk_prices(
         &self,
         offer_ids: &[&str],
-    ) -> Result<Vec<crate::api::types::fab_search::FabPriceInfo>, EpicAPIError> {
+    ) -> Result<crate::api::types::fab_search::FabBulkPricesResponse, EpicAPIError> {
         let ids = offer_ids
             .iter()
             .map(|id| format!("offer_ids={}", id))
@@ -408,5 +419,44 @@ impl EpicAPI {
         &self,
     ) -> Result<crate::api::types::fab_search::FabUserContext, EpicAPIError> {
         self.get_json("https://www.fab.com/i/users/context").await
+    }
+
+    /// Add a free listing to the user's library. Returns `Ok(())` on success (HTTP 204).
+    pub async fn fab_add_to_library(&self, listing_uid: &str) -> Result<(), EpicAPIError> {
+        let url = format!(
+            "https://www.fab.com/i/listings/{}/add-to-library",
+            listing_uid
+        );
+        let parsed_url = Url::parse(&url).map_err(|_| EpicAPIError::InvalidParams)?;
+        let response = self
+            .authorized_post_client(parsed_url)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("{:?}", e);
+                EpicAPIError::NetworkError(e)
+            })?;
+        if response.status() == reqwest::StatusCode::NO_CONTENT
+            || response.status() == reqwest::StatusCode::OK
+        {
+            Ok(())
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("{} result: {}", status, body);
+            Err(EpicAPIError::HttpError { status, body })
+        }
+    }
+
+    /// Fetch all available asset formats for a listing (UE, Unity, FBX, Blender, etc.).
+    pub async fn fab_listing_formats(
+        &self,
+        listing_uid: &str,
+    ) -> Result<Vec<crate::api::types::fab_search::FabListingFormat>, EpicAPIError> {
+        let url = format!(
+            "https://www.fab.com/i/listings/{}/asset-formats",
+            listing_uid
+        );
+        self.authorized_get_json(&url).await
     }
 }
