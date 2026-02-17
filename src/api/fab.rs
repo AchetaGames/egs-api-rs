@@ -403,17 +403,11 @@ impl EpicAPI {
     pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
         let parsed_url =
             url::Url::parse("https://www.fab.com/i/csrf").map_err(|_| EpicAPIError::InvalidParams)?;
-        let response = self.client.get(parsed_url).send().await.map_err(|e| {
-            error!("{:?}", e);
-            EpicAPIError::NetworkError(e)
-        })?;
+        let response = Self::send(self.client.get(parsed_url)).await?;
         if response.status().is_success() {
             Ok(())
         } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
+            Err(Self::error_response(response).await)
         }
     }
 
