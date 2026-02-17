@@ -1,4 +1,4 @@
-use log::{error, warn};
+use log::{debug, error, warn};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, RequestBuilder};
 use serde::de::DeserializeOwned;
@@ -116,6 +116,7 @@ impl EpicAPI {
         url: &str,
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        debug!("authorized_get_json: {}", url);
         let response = self
             .authorized_get_client(parsed_url)
             .send()
@@ -125,8 +126,13 @@ impl EpicAPI {
                 EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
-            response.json::<T>().await.map_err(|e| {
-                error!("{:?}", e);
+            let body = response.text().await.map_err(|e| {
+                error!("Failed to read response body from {}: {:?}", url, e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            serde_json::from_str::<T>(&body).map_err(|e| {
+                error!("Deserialization failed for {}: {:?}", url, e);
+                error!("Response body: {}", &body[..body.len().min(2048)]);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
@@ -144,6 +150,7 @@ impl EpicAPI {
         form: &[(String, String)],
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        debug!("authorized_post_form_json: {}", url);
         let response = self
             .authorized_post_client(parsed_url)
             .form(form)
@@ -154,8 +161,13 @@ impl EpicAPI {
                 EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
-            response.json::<T>().await.map_err(|e| {
-                error!("{:?}", e);
+            let body = response.text().await.map_err(|e| {
+                error!("Failed to read response body from {}: {:?}", url, e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            serde_json::from_str::<T>(&body).map_err(|e| {
+                error!("Deserialization failed for {}: {:?}", url, e);
+                error!("Response body: {}", &body[..body.len().min(2048)]);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
@@ -173,6 +185,7 @@ impl EpicAPI {
         body: &B,
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        debug!("authorized_post_json: {}", url);
         let response = self
             .authorized_post_client(parsed_url)
             .json(body)
@@ -183,8 +196,13 @@ impl EpicAPI {
                 EpicAPIError::NetworkError(e)
             })?;
         if response.status() == reqwest::StatusCode::OK {
-            response.json::<T>().await.map_err(|e| {
-                error!("{:?}", e);
+            let resp_body = response.text().await.map_err(|e| {
+                error!("Failed to read response body from {}: {:?}", url, e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            serde_json::from_str::<T>(&resp_body).map_err(|e| {
+                error!("Deserialization failed for {}: {:?}", url, e);
+                error!("Response body: {}", &resp_body[..resp_body.len().min(2048)]);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
@@ -226,13 +244,19 @@ impl EpicAPI {
         url: &str,
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
+        debug!("get_json: {}", url);
         let response = self.client.get(parsed_url).send().await.map_err(|e| {
             error!("{:?}", e);
             EpicAPIError::NetworkError(e)
         })?;
         if response.status() == reqwest::StatusCode::OK {
-            response.json::<T>().await.map_err(|e| {
-                error!("{:?}", e);
+            let body = response.text().await.map_err(|e| {
+                error!("Failed to read response body from {}: {:?}", url, e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            serde_json::from_str::<T>(&body).map_err(|e| {
+                error!("Deserialization failed for {}: {:?}", url, e);
+                error!("Response body: {}", &body[..body.len().min(2048)]);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
