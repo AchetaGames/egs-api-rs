@@ -1097,7 +1097,7 @@ impl EpicGames {
     pub async fn fab_bulk_prices(
         &self,
         offer_ids: &[&str],
-    ) -> Option<Vec<fab_search::FabPriceInfo>> {
+    ) -> Option<fab_search::FabBulkPricesResponse> {
         self.egs.fab_bulk_prices(offer_ids).await.ok()
     }
 
@@ -1105,7 +1105,7 @@ impl EpicGames {
     pub async fn try_fab_bulk_prices(
         &self,
         offer_ids: &[&str],
-    ) -> Result<Vec<fab_search::FabPriceInfo>, EpicAPIError> {
+    ) -> Result<fab_search::FabBulkPricesResponse, EpicAPIError> {
         self.egs.fab_bulk_prices(offer_ids).await
     }
 
@@ -1257,6 +1257,27 @@ impl EpicGames {
         &self,
     ) -> Result<fab_search::FabUserContext, EpicAPIError> {
         self.egs.fab_user_context().await
+    }
+
+    /// Add a free listing to the user's library. Returns `Ok(())` on success.
+    pub async fn fab_add_to_library(&self, listing_uid: &str) -> Result<(), EpicAPIError> {
+        self.egs.fab_add_to_library(listing_uid).await
+    }
+
+    /// Fetch all available asset formats for a listing. Returns `None` on error.
+    pub async fn fab_listing_formats(
+        &self,
+        listing_uid: &str,
+    ) -> Option<Vec<fab_search::FabListingFormat>> {
+        self.egs.fab_listing_formats(listing_uid).await.ok()
+    }
+
+    /// Fetch all available asset formats. Returns full `Result`.
+    pub async fn try_fab_listing_formats(
+        &self,
+        listing_uid: &str,
+    ) -> Result<Vec<fab_search::FabListingFormat>, EpicAPIError> {
+        self.egs.fab_listing_formats(listing_uid).await
     }
 
     // --- Cosmos Policy/Communication ---

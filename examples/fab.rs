@@ -246,11 +246,15 @@ async fn main() {
                                     .price
                                     .map(|p| format!("{:.2}", p))
                                     .unwrap_or_else(|| "N/A".to_string());
-                                let discount = price.discount.unwrap_or(0.0);
-                                if discount > 0.0 {
+                                let discount_pct = price.discount_percentage.unwrap_or(0);
+                                if discount_pct > 0 {
+                                    let discounted = price
+                                        .discounted_price
+                                        .map(|p| format!("{:.2}", p))
+                                        .unwrap_or_else(|| "N/A".to_string());
                                     println!(
-                                        "  {} {} (discount: {:.0}%)",
-                                        currency, amount, discount
+                                        "  {} {} → {} ({}% off)",
+                                        currency, amount, discounted, discount_pct
                                     );
                                 } else {
                                     println!("  {} {}", currency, amount);

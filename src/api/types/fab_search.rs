@@ -137,10 +137,24 @@ pub struct FabTechnicalSpecs {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FabPriceInfo {
+    pub offer_id: Option<String>,
     pub currency_code: Option<String>,
     pub price: Option<f64>,
-    pub discount: Option<f64>,
+    pub discounted_price: Option<f64>,
+    pub discount_percentage: Option<u32>,
+    pub effective_discount_percentage: Option<u32>,
+    pub discount_start_date: Option<String>,
+    pub discount_end_date: Option<String>,
+    pub lowest_prior_price: Option<f64>,
     pub vat: Option<f64>,
+    pub vat_rate: Option<f64>,
+}
+
+/// Wrapper for bulk pricing response from `GET /i/listings/prices-infos?offer_ids=...`.
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FabBulkPricesResponse {
+    pub offers: Vec<FabPriceInfo>,
 }
 
 /// Ownership info from `GET /i/listings/{uid}/ownership`.
@@ -272,11 +286,35 @@ mod tests {
 
     #[test]
     fn deserialize_price_info() {
-        let json = r#"{"currencyCode": "USD", "price": 29.99, "discount": 0.0, "vat": 0.0}"#;
+        let json = r#"{"offerId": "abc123", "currencyCode": "USD", "price": 29.99, "discountedPrice": 29.99, "vat": 0.0, "vatRate": 0.21}"#;
         let price: FabPriceInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(price.offer_id.as_deref(), Some("abc123"));
         assert_eq!(price.currency_code.as_deref(), Some("USD"));
         assert_eq!(price.price, Some(29.99));
-        assert_eq!(price.discount, Some(0.0));
+        assert_eq!(price.discounted_price, Some(29.99));
+        assert_eq!(price.vat_rate, Some(0.21));
+    }
+
+    #[test]
+    fn deserialize_price_info_with_discount() {
+        let json = r#"{
+            "offerId": "offer-disc",
+            "currencyCode": "CZK",
+            "price": 1238.42,
+            "discountedPrice": 0.0,
+            "discountPercentage": 100,
+            "effectiveDiscountPercentage": 100,
+            "discountStartDate": "2026-02-10T15:00:00.000Z",
+            "discountEndDate": "2026-02-24T14:59:00.000Z",
+            "lowestPriorPrice": 866.81,
+            "vat": 0.0,
+            "vatRate": 0.21
+        }"#;
+        let price: FabPriceInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(price.discount_percentage, Some(100));
+        assert_eq!(price.discounted_price, Some(0.0));
+        assert_eq!(price.lowest_prior_price, Some(866.81));
+        assert!(price.discount_end_date.is_some());
     }
 
     #[test]
@@ -317,6 +355,46 @@ mod tests {
         assert!(params.sort_by.is_none());
         assert!(params.count.is_none());
         assert!(params.is_discounted.is_none());
+        assert!(params.is_free.is_none());
+        assert!(params.min_discount_percentage.is_none());
+        assert!(params.seller.is_none());
+    }
+
+    #[test]
+    fn deserialize_listing_formats() {
+        let json = r#"[
+            {
+                "assetFormatType": {"code": "unreal-engine", "icon": "unreal-engine", "name": "Unreal Engine"},
+                "files": [{"uid": "file-001", "name": "MyAsset V1", "fileSize": 3444643477}]
+            },
+            {
+                "assetFormatType": {"code": "fbx", "icon": "cube", "name": "FBX"},
+                "files": [{"uid": "file-002", "name": "myasset.zip", "fileSize": 1234567}]
+            }
+        ]"#;
+        let formats: Vec<FabListingFormat> = serde_json::from_str(json).unwrap();
+        assert_eq!(formats.len(), 2);
+        let ue = &formats[0];
+        assert_eq!(
+            ue.asset_format_type.as_ref().unwrap().code.as_deref(),
+            Some("unreal-engine")
+        );
+        let files = ue.files.as_ref().unwrap();
+        assert_eq!(files[0].uid.as_deref(), Some("file-001"));
+        assert_eq!(files[0].file_size, Some(3444643477));
+        let fbx = &formats[1];
+        assert_eq!(
+            fbx.asset_format_type.as_ref().unwrap().code.as_deref(),
+            Some("fbx")
+        );
+    }
+
+    #[test]
+    fn deserialize_listing_formats_empty_files() {
+        let json = r#"[{"assetFormatType": {"code": "blender", "name": "Blender"}, "files": []}]"#;
+        let formats: Vec<FabListingFormat> = serde_json::from_str(json).unwrap();
+        assert_eq!(formats.len(), 1);
+        assert!(formats[0].files.as_ref().unwrap().is_empty());
     }
 
     #[test]
@@ -541,4 +619,33 @@ pub struct FabSearchParams {
     pub in_filter: Option<String>,
     /// Only discounted items
     pub is_discounted: Option<bool>,
+    /// Only free items
+    pub is_free: Option<bool>,
+    /// Minimum discount percentage (e.g. `1` for any discount, `50` for 50%+ off)
+    pub min_discount_percentage: Option<u32>,
+    /// Filter by seller name
+    pub seller: Option<String>,
+}
+
+/// All available asset formats for a listing from `GET /i/listings/{uid}/asset-formats`.
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FabListingFormat {
+    pub asset_format_type: Option<FabAssetFormatType>,
+    pub files: Option<Vec<FabFormatFile>>,
+}
+
+/// A downloadable file within a listing format.
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FabFormatFile {
+    pub uid: Option<String>,
+    pub name: Option<String>,
+    pub file_size: Option<u64>,
+    pub asset_type: Option<String>,
+    pub platforms_included: Option<Vec<String>>,
+    pub initial_engine_version: Option<String>,
+    pub engine_versions: Option<Vec<String>>,
 }
