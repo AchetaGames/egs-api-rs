@@ -110,40 +110,64 @@ impl EpicAPI {
         )
     }
 
-    /// Send an authorized GET request and deserialize the JSON response
+    async fn send(request: RequestBuilder) -> Result<reqwest::Response, EpicAPIError> {
+        request.send().await.map_err(|e| {
+            error!("{:?}", e);
+            EpicAPIError::NetworkError(e)
+        })
+    }
+
+    fn require_ok(response: &reqwest::Response) -> Result<(), ()> {
+        if response.status() == reqwest::StatusCode::OK {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    async fn error_response(response: reqwest::Response) -> EpicAPIError {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        warn!("{} result: {}", status, body);
+        EpicAPIError::HttpError { status, body }
+    }
+
+    async fn read_json<T: DeserializeOwned>(
+        response: reqwest::Response,
+        url: &str,
+    ) -> Result<T, EpicAPIError> {
+        let body = response.text().await.map_err(|e| {
+            error!("Failed to read response body from {}: {:?}", url, e);
+            EpicAPIError::DeserializationError(format!("{}", e))
+        })?;
+        serde_json::from_str::<T>(&body).map_err(|e| {
+            error!("Deserialization failed for {}: {:?}", url, e);
+            error!("Response body: {}", &body[..body.len().min(2048)]);
+            EpicAPIError::DeserializationError(format!("{}", e))
+        })
+    }
+
+    async fn send_and_deserialize<T: DeserializeOwned>(
+        request: RequestBuilder,
+        url: &str,
+    ) -> Result<T, EpicAPIError> {
+        let response = Self::send(request).await?;
+        if Self::require_ok(&response).is_ok() {
+            Self::read_json(response, url).await
+        } else {
+            Err(Self::error_response(response).await)
+        }
+    }
+
     pub(crate) async fn authorized_get_json<T: DeserializeOwned>(
         &self,
         url: &str,
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
         debug!("authorized_get_json: {}", url);
-        let response = self
-            .authorized_get_client(parsed_url)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("{:?}", e);
-                EpicAPIError::NetworkError(e)
-            })?;
-        if response.status() == reqwest::StatusCode::OK {
-            let body = response.text().await.map_err(|e| {
-                error!("Failed to read response body from {}: {:?}", url, e);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })?;
-            serde_json::from_str::<T>(&body).map_err(|e| {
-                error!("Deserialization failed for {}: {:?}", url, e);
-                error!("Response body: {}", &body[..body.len().min(2048)]);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
-        }
+        Self::send_and_deserialize(self.authorized_get_client(parsed_url), url).await
     }
 
-    /// Send an authorized POST request with form data and deserialize the JSON response
     pub(crate) async fn authorized_post_form_json<T: DeserializeOwned>(
         &self,
         url: &str,
@@ -151,34 +175,9 @@ impl EpicAPI {
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
         debug!("authorized_post_form_json: {}", url);
-        let response = self
-            .authorized_post_client(parsed_url)
-            .form(form)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("{:?}", e);
-                EpicAPIError::NetworkError(e)
-            })?;
-        if response.status() == reqwest::StatusCode::OK {
-            let body = response.text().await.map_err(|e| {
-                error!("Failed to read response body from {}: {:?}", url, e);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })?;
-            serde_json::from_str::<T>(&body).map_err(|e| {
-                error!("Deserialization failed for {}: {:?}", url, e);
-                error!("Response body: {}", &body[..body.len().min(2048)]);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
-        }
+        Self::send_and_deserialize(self.authorized_post_client(parsed_url).form(form), url).await
     }
 
-    /// Send an authorized POST request with a JSON body and deserialize the JSON response
     pub(crate) async fn authorized_post_json<T: DeserializeOwned, B: serde::Serialize>(
         &self,
         url: &str,
@@ -186,108 +185,42 @@ impl EpicAPI {
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
         debug!("authorized_post_json: {}", url);
-        let response = self
-            .authorized_post_client(parsed_url)
-            .json(body)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("{:?}", e);
-                EpicAPIError::NetworkError(e)
-            })?;
-        if response.status() == reqwest::StatusCode::OK {
-            let resp_body = response.text().await.map_err(|e| {
-                error!("Failed to read response body from {}: {:?}", url, e);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })?;
-            serde_json::from_str::<T>(&resp_body).map_err(|e| {
-                error!("Deserialization failed for {}: {:?}", url, e);
-                error!("Response body: {}", &resp_body[..resp_body.len().min(2048)]);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
-        }
+        Self::send_and_deserialize(self.authorized_post_client(parsed_url).json(body), url).await
     }
 
-    /// Send an unauthenticated GET request and return the raw bytes
     pub(crate) async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
-        let response = self
-            .client
-            .get(parsed_url)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("{:?}", e);
-                EpicAPIError::NetworkError(e)
-            })?;
-        if response.status() == reqwest::StatusCode::OK {
+        let response = Self::send(self.client.get(parsed_url)).await?;
+        if Self::require_ok(&response).is_ok() {
             response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
                 error!("{:?}", e);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
         } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
+            Err(Self::error_response(response).await)
         }
     }
 
-    /// Send an unauthenticated GET request and deserialize the JSON response
     pub(crate) async fn get_json<T: DeserializeOwned>(
         &self,
         url: &str,
     ) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
         debug!("get_json: {}", url);
-        let response = self.client.get(parsed_url).send().await.map_err(|e| {
-            error!("{:?}", e);
-            EpicAPIError::NetworkError(e)
-        })?;
-        if response.status() == reqwest::StatusCode::OK {
-            let body = response.text().await.map_err(|e| {
-                error!("Failed to read response body from {}: {:?}", url, e);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })?;
-            serde_json::from_str::<T>(&body).map_err(|e| {
-                error!("Deserialization failed for {}: {:?}", url, e);
-                error!("Response body: {}", &body[..body.len().min(2048)]);
-                EpicAPIError::DeserializationError(format!("{}", e))
-            })
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
-        }
+        Self::send_and_deserialize(self.client.get(parsed_url), url).await
     }
 
     #[allow(dead_code)]
-    /// Send an authorized DELETE request, returning Ok(()) on success
     pub(crate) async fn authorized_delete(&self, url: &str) -> Result<(), EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
-        let response = self
-            .set_authorization_header(self.client.delete(parsed_url))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("{:?}", e);
-                EpicAPIError::NetworkError(e)
-            })?;
+        let response =
+            Self::send(self.set_authorization_header(self.client.delete(parsed_url))).await?;
         if response.status() == reqwest::StatusCode::OK
             || response.status() == reqwest::StatusCode::NO_CONTENT
         {
             Ok(())
         } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            warn!("{} result: {}", status, body);
-            Err(EpicAPIError::HttpError { status, body })
+            Err(Self::error_response(response).await)
         }
     }
 }
