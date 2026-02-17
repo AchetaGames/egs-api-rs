@@ -24,9 +24,19 @@ pub struct FabFormatGroup {
 #[allow(missing_docs)]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FabTagGroup {
+    pub category: Option<String>,
     pub name: Option<String>,
+    pub order: Option<i32>,
     pub slug: Option<String>,
     pub tags: Option<Vec<FabTag>>,
+    pub uid: Option<String>,
+}
+
+/// Paginated wrapper returned by Fab API endpoints.
+#[allow(missing_docs)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FabResultsWrapper<T> {
+    pub results: Vec<T>,
 }
 
 /// Channel info from `GET /i/channels/{slug}`.
@@ -73,18 +83,35 @@ mod tests {
     #[test]
     fn deserialize_tag_group() {
         let json = r#"{
-            "name": "Style",
-            "slug": "style",
+            "category": "style",
+            "name": "Rendering Style",
+            "order": 0,
+            "slug": "rendering-style",
             "tags": [
                 {"name": "Realistic", "slug": "realistic", "uid": "tag-1"},
                 {"name": "Stylized", "slug": "stylized", "uid": "tag-2"}
-            ]
+            ],
+            "uid": "group-1"
         }"#;
         let group: FabTagGroup = serde_json::from_str(json).unwrap();
-        assert_eq!(group.name, Some("Style".to_string()));
+        assert_eq!(group.category, Some("style".to_string()));
+        assert_eq!(group.name, Some("Rendering Style".to_string()));
+        assert_eq!(group.order, Some(0));
         let tags = group.tags.unwrap();
         assert_eq!(tags.len(), 2);
         assert_eq!(tags[0].name, Some("Realistic".to_string()));
+    }
+
+    #[test]
+    fn deserialize_tag_group_results_wrapper() {
+        let json = r#"{"results": [
+            {"category": "style", "name": "Style", "slug": "style", "order": 0, "tags": [], "uid": "g1"},
+            {"category": "theme", "name": "Theme", "slug": "theme", "order": 1, "tags": [], "uid": "g2"}
+        ]}"#;
+        let wrapper: FabResultsWrapper<FabTagGroup> = serde_json::from_str(json).unwrap();
+        assert_eq!(wrapper.results.len(), 2);
+        assert_eq!(wrapper.results[0].slug, Some("style".to_string()));
+        assert_eq!(wrapper.results[1].slug, Some("theme".to_string()));
     }
 
     #[test]

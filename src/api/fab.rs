@@ -325,7 +325,10 @@ impl EpicAPI {
     pub async fn fab_tag_groups(
         &self,
     ) -> Result<Vec<crate::api::types::fab_taxonomy::FabTagGroup>, EpicAPIError> {
-        self.get_json("https://www.fab.com/i/tags/groups").await
+        let wrapper: crate::api::types::fab_taxonomy::FabResultsWrapper<
+            crate::api::types::fab_taxonomy::FabTagGroup,
+        > = self.get_json("https://www.fab.com/i/tags/groups").await?;
+        Ok(wrapper.results)
     }
 
     /// Fetch available UE versions. Public endpoint.
