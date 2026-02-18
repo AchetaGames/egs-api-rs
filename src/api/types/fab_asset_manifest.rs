@@ -93,16 +93,18 @@ mod tests {
     #[test]
     fn get_distribution_point_by_base_url_not_found() {
         let di = make_download_info(vec!["https://cdn1.example.com/manifest.json"]);
-        assert!(di
-            .get_distribution_point_by_base_url("https://cdn3")
-            .is_none());
+        assert!(
+            di.get_distribution_point_by_base_url("https://cdn3")
+                .is_none()
+        );
     }
 
     #[test]
     fn get_distribution_point_by_base_url_empty() {
         let di = make_download_info(vec![]);
-        assert!(di
-            .get_distribution_point_by_base_url("https://anything")
-            .is_none());
+        assert!(
+            di.get_distribution_point_by_base_url("https://anything")
+                .is_none()
+        );
     }
 }

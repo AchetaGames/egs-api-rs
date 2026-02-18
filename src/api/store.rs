@@ -1,8 +1,8 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::uplay::{
     UplayClaimResult, UplayCodesResult, UplayGraphQLResponse, UplayRedeemResult,
 };
-use crate::api::EpicAPI;
 use log::error;
 
 const UPLAY_CODES_QUERY: &str = r#"
@@ -132,8 +132,7 @@ impl EpicAPI {
         &self,
         body: &serde_json::Value,
     ) -> Result<T, EpicAPIError> {
-        let parsed_url =
-            url::Url::parse(STORE_GQL_URL).map_err(|_| EpicAPIError::InvalidParams)?;
+        let parsed_url = url::Url::parse(STORE_GQL_URL).map_err(|_| EpicAPIError::InvalidParams)?;
         let response = self
             .set_authorization_header(self.client.post(parsed_url))
             .header("User-Agent", STORE_USER_AGENT)

@@ -1,3 +1,4 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::asset_info::{AssetInfo, GameToken, OwnershipToken};
 use crate::api::types::asset_manifest::AssetManifest;
@@ -7,7 +8,6 @@ use crate::api::types::currency::CurrencyPage;
 use crate::api::types::download_manifest::DownloadManifest;
 use crate::api::types::epic_asset::EpicAsset;
 use crate::api::types::library::Library;
-use crate::api::EpicAPI;
 use log::{debug, error};
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
@@ -21,7 +21,10 @@ impl EpicAPI {
     ) -> Result<Vec<EpicAsset>, EpicAPIError> {
         let plat = platform.unwrap_or_else(|| "Windows".to_string());
         let lab = label.unwrap_or_else(|| "Live".to_string());
-        let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/{}?label={}", plat, lab);
+        let url = format!(
+            "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/{}?label={}",
+            plat, lab
+        );
         self.authorized_get_json(&url).await
     }
 
@@ -43,8 +46,14 @@ impl EpicAPI {
         if app.is_none() {
             return Err(EpicAPIError::InvalidParams);
         };
-        let url = format!("https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
-                          platform.as_deref().unwrap_or("Windows"), namespace.as_deref().unwrap(), item_id.as_deref().unwrap(), app.as_deref().unwrap(), label.as_deref().unwrap_or("Live"));
+        let url = format!(
+            "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/v2/platform/{}/namespace/{}/catalogItem/{}/app/{}/label/{}",
+            platform.as_deref().unwrap_or("Windows"),
+            namespace.as_deref().unwrap(),
+            item_id.as_deref().unwrap(),
+            app.as_deref().unwrap(),
+            label.as_deref().unwrap_or("Live")
+        );
         let mut manifest: AssetManifest = self.authorized_get_json(&url).await?;
         manifest.platform = platform;
         manifest.label = label;
@@ -121,8 +130,10 @@ impl EpicAPI {
         &self,
         asset: &EpicAsset,
     ) -> Result<HashMap<String, AssetInfo>, EpicAPIError> {
-        let url = format!("https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/{}/bulk/items?id={}&includeDLCDetails=true&includeMainGameDetails=true&country=us&locale=lc",
-                          asset.namespace, asset.catalog_item_id);
+        let url = format!(
+            "https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/namespace/{}/bulk/items?id={}&includeDLCDetails=true&includeMainGameDetails=true&country=us&locale=lc",
+            asset.namespace, asset.catalog_item_id
+        );
         self.authorized_get_json(&url).await
     }
 
@@ -141,8 +152,10 @@ impl EpicAPI {
                 return Err(EpicAPIError::InvalidCredentials);
             }
             Some(id) => {
-                format!("https://ecommerceintegration-public-service-ecomprod02.ol.epicgames.com/ecommerceintegration/api/public/platforms/EPIC/identities/{}/ownershipToken",
-                        id)
+                format!(
+                    "https://ecommerceintegration-public-service-ecomprod02.ol.epicgames.com/ecommerceintegration/api/public/platforms/EPIC/identities/{}/ownershipToken",
+                    id
+                )
             }
         };
         self.authorized_post_form_json(
@@ -230,7 +243,10 @@ impl EpicAPI {
         if old_build_id == new_build_id {
             return None;
         }
-        let url = format!("{}/Deltas/{}/{}.delta", base_url, new_build_id, old_build_id);
+        let url = format!(
+            "{}/Deltas/{}/{}.delta",
+            base_url, new_build_id, old_build_id
+        );
         self.get_bytes(&url).await.ok()
     }
 
@@ -244,10 +260,16 @@ impl EpicAPI {
         loop {
             let url = match &cursor {
                 None => {
-                    format!("https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata={}", include_metadata)
+                    format!(
+                        "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata={}",
+                        include_metadata
+                    )
                 }
                 Some(c) => {
-                    format!("https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata={}&cursor={}", include_metadata, c)
+                    format!(
+                        "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata={}&cursor={}",
+                        include_metadata, c
+                    )
                 }
             };
 
@@ -331,11 +353,7 @@ impl EpicAPI {
     }
 
     /// Fetch available currencies.
-    pub async fn currencies(
-        &self,
-        start: i64,
-        count: i64,
-    ) -> Result<CurrencyPage, EpicAPIError> {
+    pub async fn currencies(&self, start: i64, count: i64) -> Result<CurrencyPage, EpicAPIError> {
         let url = format!(
             "https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/currencies?start={}&count={}",
             start, count
@@ -344,10 +362,7 @@ impl EpicAPI {
     }
 
     /// Check the status of a library state token.
-    pub async fn library_state_token_status(
-        &self,
-        token_id: &str,
-    ) -> Result<bool, EpicAPIError> {
+    pub async fn library_state_token_status(&self, token_id: &str) -> Result<bool, EpicAPIError> {
         let url = format!(
             "https://library-service.live.use1a.on.epicgames.com/library/api/public/stateToken/{}/status",
             token_id

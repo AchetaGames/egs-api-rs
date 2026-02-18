@@ -38,7 +38,9 @@ async fn main() {
                         );
                     }
                 }
-                None => println!("No Uplay codes found (account may not have Ubisoft-linked games)."),
+                None => {
+                    println!("No Uplay codes found (account may not have Ubisoft-linked games).")
+                }
             }
         }
         Err(e) => eprintln!("Failed to fetch Uplay codes: {:?}", e),

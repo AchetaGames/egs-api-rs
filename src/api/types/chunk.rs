@@ -80,8 +80,8 @@ impl Chunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use flate2::write::ZlibEncoder;
     use flate2::Compression;
+    use flate2::write::ZlibEncoder;
     use std::io::Write;
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
         assert!(chunk.guid.starts_with("00000000"));
         assert_eq!(chunk.hash, 42);
         assert_eq!(chunk.data, vec![1, 2, 3, 4, 5]);
-        assert_eq!(chunk.compressed, false);
+        assert!(!chunk.compressed);
     }
 
     #[test]

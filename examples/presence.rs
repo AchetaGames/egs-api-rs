@@ -1,8 +1,8 @@
 #[path = "common.rs"]
 mod common;
 
-use egs_api::api::types::presence::{PresenceActivity, PresenceUpdate};
 use egs_api::EpicGames;
+use egs_api::api::types::presence::{PresenceActivity, PresenceUpdate};
 
 #[tokio::main]
 async fn main() {
@@ -16,10 +16,7 @@ async fn main() {
 
     println!("=== Update Presence ===\n");
 
-    let session_id = egs
-        .user_details()
-        .account_id
-        .unwrap_or_default();
+    let session_id = egs.user_details().account_id.unwrap_or_default();
 
     if session_id.is_empty() {
         eprintln!("No access token available for presence update");

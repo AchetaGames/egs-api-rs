@@ -1,8 +1,8 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::billing_account::BillingAccount;
 use crate::api::types::price::PriceResponse;
 use crate::api::types::quick_purchase::QuickPurchaseResponse;
-use crate::api::EpicAPI;
 
 impl EpicAPI {
     /// Fetch offer prices from the price engine.
@@ -18,7 +18,7 @@ impl EpicAPI {
             "offers": offer_ids,
             "country": country,
         });
-        self.authorized_post_json(&url, &body).await
+        self.authorized_post_json(url, &body).await
     }
 
     /// Execute a quick purchase (typically for free game claims).

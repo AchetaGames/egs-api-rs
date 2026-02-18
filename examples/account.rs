@@ -61,11 +61,7 @@ async fn main() {
         Some(auths) => {
             println!("Linked platforms: {}", auths.len());
             for auth in &auths {
-                println!(
-                    "  {} - {}",
-                    auth.type_field,
-                    auth.external_display_name
-                );
+                println!("  {} - {}", auth.type_field, auth.external_display_name);
             }
         }
         None => eprintln!("Failed to fetch external auth connections"),

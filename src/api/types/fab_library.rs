@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use serde_with::DefaultOnNull;
+use serde_with::serde_as;
 
 /// Fab Library Response
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

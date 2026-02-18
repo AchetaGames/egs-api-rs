@@ -1,6 +1,6 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::account::{TokenVerification, UserData};
-use crate::EpicGames;
 use log::{error, info, warn};
 
 impl EpicGames {

@@ -26,11 +26,11 @@ pub mod fab;
 ///Account methods
 pub mod account;
 
-/// EGS Methods
-pub mod egs;
 #[allow(dead_code)]
 /// Cloud Save Methods
 pub mod cloud_save;
+/// EGS Methods
+pub mod egs;
 /// Session Handling
 pub mod login;
 
@@ -201,10 +201,7 @@ impl EpicAPI {
         }
     }
 
-    pub(crate) async fn get_json<T: DeserializeOwned>(
-        &self,
-        url: &str,
-    ) -> Result<T, EpicAPIError> {
+    pub(crate) async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, EpicAPIError> {
         let parsed_url = Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?;
         debug!("get_json: {}", url);
         Self::send_and_deserialize(self.client.get(parsed_url), url).await

@@ -1,8 +1,8 @@
 #[path = "common.rs"]
 mod common;
 
-use egs_api::api::types::fab_search::FabSearchParams;
 use egs_api::EpicGames;
+use egs_api::api::types::fab_search::FabSearchParams;
 
 #[tokio::main]
 async fn main() {
@@ -151,25 +151,13 @@ async fn main() {
                                 );
                             }
                             if let Some(ref specs) = fmt.technical_specs {
-                                if let Some(ref versions) =
-                                    specs.unreal_engine_engine_versions
-                                {
-                                    println!(
-                                        "    Engine versions: {}",
-                                        versions.join(", ")
-                                    );
+                                if let Some(ref versions) = specs.unreal_engine_engine_versions {
+                                    println!("    Engine versions: {}", versions.join(", "));
                                 }
-                                if let Some(ref platforms) =
-                                    specs.unreal_engine_target_platforms
-                                {
-                                    println!(
-                                        "    Platforms: {}",
-                                        platforms.join(", ")
-                                    );
+                                if let Some(ref platforms) = specs.unreal_engine_target_platforms {
+                                    println!("    Platforms: {}", platforms.join(", "));
                                 }
-                                if let Some(ref method) =
-                                    specs.unreal_engine_distribution_method
-                                {
+                                if let Some(ref method) = specs.unreal_engine_distribution_method {
                                     println!("    Distribution: {}", method);
                                 }
                             }
@@ -186,14 +174,8 @@ async fn main() {
 
                 match egs.fab_listing_state(&first.uid).await {
                     Some(state) => {
-                        println!(
-                            "  Acquired:    {}",
-                            state.acquired.unwrap_or(false)
-                        );
-                        println!(
-                            "  Wishlisted:  {}",
-                            state.wishlisted.unwrap_or(false)
-                        );
+                        println!("  Acquired:    {}", state.acquired.unwrap_or(false));
+                        println!("  Wishlisted:  {}", state.wishlisted.unwrap_or(false));
                         if let Some(ref eid) = state.entitlement_id {
                             println!("  Entitlement: {}", eid);
                         }
@@ -238,10 +220,7 @@ async fn main() {
                             println!("  No pricing info (may be free)");
                         } else {
                             for price in &prices {
-                                let currency = price
-                                    .currency_code
-                                    .as_deref()
-                                    .unwrap_or("?");
+                                let currency = price.currency_code.as_deref().unwrap_or("?");
                                 let amount = price
                                     .price
                                     .map(|p| format!("{:.2}", p))
@@ -271,12 +250,12 @@ async fn main() {
 
                 println!("\n=== Listing Reviews ===\n");
 
-                match egs.fab_listing_reviews(&first.uid, Some("-createdAt"), None).await {
+                match egs
+                    .fab_listing_reviews(&first.uid, Some("-createdAt"), None)
+                    .await
+                {
                     Some(reviews_resp) => {
-                        println!(
-                            "  Total reviews: {}",
-                            reviews_resp.count.unwrap_or(0)
-                        );
+                        println!("  Total reviews: {}", reviews_resp.count.unwrap_or(0));
                         for review in reviews_resp.results.iter().take(3) {
                             let author = review
                                 .user
@@ -287,14 +266,10 @@ async fn main() {
                                 .rating
                                 .map(|r| format!("{}/5", r))
                                 .unwrap_or_else(|| "?".to_string());
-                            let title = review
-                                .title
-                                .as_deref()
-                                .unwrap_or("(no title)");
+                            let title = review.title.as_deref().unwrap_or("(no title)");
                             println!("  [{}] {} — {}", rating, title, author);
                             if let Some(ref content) = review.content {
-                                let preview: String =
-                                    content.chars().take(80).collect();
+                                let preview: String = content.chars().take(80).collect();
                                 if content.len() > 80 {
                                     println!("    {}...", preview);
                                 } else {

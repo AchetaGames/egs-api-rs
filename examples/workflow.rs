@@ -92,7 +92,10 @@ async fn main() {
                     Ok(d) => {
                         println!("Got download manifest from {}", url);
                         println!("Expected Hash: {}", man.manifest_hash);
-                        println!("Download Hash: {}", d.custom_field("DownloadedManifestHash").unwrap_or_default());
+                        println!(
+                            "Download Hash: {}",
+                            d.custom_field("DownloadedManifestHash").unwrap_or_default()
+                        );
                     }
                     Err(_) => {}
                 }

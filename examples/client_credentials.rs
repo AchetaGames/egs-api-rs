@@ -18,9 +18,7 @@ async fn main() {
     let mut client_egs = EpicGames::new();
     if client_egs.auth_client_credentials().await {
         println!("Client credentials auth succeeded");
-        println!(
-            "Token type: client_credentials (limited permissions, no user context)"
-        );
+        println!("Token type: client_credentials (limited permissions, no user context)");
     } else {
         eprintln!("Client credentials auth failed");
         return;
@@ -31,6 +29,9 @@ async fn main() {
     let test_token = "test-token-id";
     match egs.library_state_token_status(test_token).await {
         Some(valid) => println!("Token '{}' valid: {}", test_token, valid),
-        None => println!("Token '{}': could not check status (API error or invalid)", test_token),
+        None => println!(
+            "Token '{}': could not check status (API error or invalid)",
+            test_token
+        ),
     }
 }

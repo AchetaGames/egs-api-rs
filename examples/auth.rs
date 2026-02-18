@@ -40,7 +40,10 @@ async fn main() {
     }
 
     let details = egs.user_details();
-    println!("\nLogged in as: {}", details.display_name.unwrap_or_default());
+    println!(
+        "\nLogged in as: {}",
+        details.display_name.unwrap_or_default()
+    );
     println!("Account ID: {}", details.account_id.unwrap_or_default());
 
     println!("\nToken saved. Run other examples without re-authenticating.");

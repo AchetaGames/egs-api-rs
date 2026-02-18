@@ -1,10 +1,10 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::download_manifest::DownloadManifest;
 use crate::api::types::fab_asset_manifest::DownloadInfo;
 use crate::api::types::fab_entitlement;
 use crate::api::types::fab_search;
 use crate::api::types::fab_taxonomy;
-use crate::EpicGames;
 
 impl EpicGames {
     /// Fetch Fab asset manifest with signed distribution points.
@@ -137,10 +137,7 @@ impl EpicGames {
     }
 
     /// Get listing state (ownership, wishlist, review). Returns `None` on error.
-    pub async fn fab_listing_state(
-        &self,
-        uid: &str,
-    ) -> Option<fab_search::FabListingState> {
+    pub async fn fab_listing_state(&self, uid: &str) -> Option<fab_search::FabListingState> {
         self.egs.fab_listing_state(uid).await.ok()
     }
 
@@ -185,10 +182,7 @@ impl EpicGames {
     }
 
     /// Get listing ownership info. Returns `None` on error.
-    pub async fn fab_listing_ownership(
-        &self,
-        uid: &str,
-    ) -> Option<fab_search::FabOwnership> {
+    pub async fn fab_listing_ownership(&self, uid: &str) -> Option<fab_search::FabOwnership> {
         self.egs.fab_listing_ownership(uid).await.ok()
     }
 
@@ -201,10 +195,7 @@ impl EpicGames {
     }
 
     /// Get pricing for a specific listing. Returns `None` on error.
-    pub async fn fab_listing_prices(
-        &self,
-        uid: &str,
-    ) -> Option<Vec<fab_search::FabPriceInfo>> {
+    pub async fn fab_listing_prices(&self, uid: &str) -> Option<Vec<fab_search::FabPriceInfo>> {
         self.egs.fab_listing_prices(uid).await.ok()
     }
 
@@ -223,7 +214,10 @@ impl EpicGames {
         sort_by: Option<&str>,
         cursor: Option<&str>,
     ) -> Option<fab_search::FabReviewsResponse> {
-        self.egs.fab_listing_reviews(uid, sort_by, cursor).await.ok()
+        self.egs
+            .fab_listing_reviews(uid, sort_by, cursor)
+            .await
+            .ok()
     }
 
     /// Get reviews for a listing. Returns full `Result`.
@@ -268,9 +262,7 @@ impl EpicGames {
     }
 
     /// Fetch tag groups with nested tags. Returns full `Result`.
-    pub async fn try_fab_tag_groups(
-        &self,
-    ) -> Result<Vec<fab_taxonomy::FabTagGroup>, EpicAPIError> {
+    pub async fn try_fab_tag_groups(&self) -> Result<Vec<fab_taxonomy::FabTagGroup>, EpicAPIError> {
         self.egs.fab_tag_groups().await
     }
 
@@ -328,9 +320,7 @@ impl EpicGames {
     }
 
     /// Fetch Fab user context. Returns full `Result`.
-    pub async fn try_fab_user_context(
-        &self,
-    ) -> Result<fab_search::FabUserContext, EpicAPIError> {
+    pub async fn try_fab_user_context(&self) -> Result<fab_search::FabUserContext, EpicAPIError> {
         self.egs.fab_user_context().await
     }
 

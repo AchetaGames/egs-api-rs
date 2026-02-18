@@ -1,6 +1,6 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::presence::PresenceUpdate;
-use crate::api::EpicAPI;
 
 impl EpicAPI {
     /// Update user presence status.

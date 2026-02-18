@@ -1,8 +1,8 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::account::{AccountData, AccountInfo, ExternalAuth, TokenVerification};
 use crate::api::types::entitlement::Entitlement;
 use crate::api::types::friends::Friend;
-use crate::api::EpicAPI;
 
 impl EpicAPI {
     /// Fetch account details for the logged-in user.

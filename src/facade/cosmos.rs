@@ -1,6 +1,6 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::cosmos;
-use crate::EpicGames;
 
 impl EpicGames {
     /// Set up a Cosmos cookie session from an exchange code.
@@ -13,9 +13,7 @@ impl EpicGames {
     }
 
     /// Upgrade bearer token to Cosmos session (step 5 of session setup).
-    pub async fn cosmos_auth_upgrade(
-        &self,
-    ) -> Result<cosmos::CosmosAuthResponse, EpicAPIError> {
+    pub async fn cosmos_auth_upgrade(&self) -> Result<cosmos::CosmosAuthResponse, EpicAPIError> {
         self.egs.cosmos_auth_upgrade().await
     }
 
@@ -77,17 +75,12 @@ impl EpicGames {
     }
 
     /// Check Age of Digital Consent policy. Returns full `Result`.
-    pub async fn try_cosmos_policy_aodc(
-        &self,
-    ) -> Result<cosmos::CosmosPolicyAodc, EpicAPIError> {
+    pub async fn try_cosmos_policy_aodc(&self) -> Result<cosmos::CosmosPolicyAodc, EpicAPIError> {
         self.egs.cosmos_policy_aodc().await
     }
 
     /// Check communication opt-in status. Returns `None` on error.
-    pub async fn cosmos_comm_opt_in(
-        &self,
-        setting: &str,
-    ) -> Option<cosmos::CosmosCommOptIn> {
+    pub async fn cosmos_comm_opt_in(&self, setting: &str) -> Option<cosmos::CosmosCommOptIn> {
         self.egs.cosmos_comm_opt_in(setting).await.ok()
     }
 
@@ -109,7 +102,9 @@ impl EpicGames {
         locale: Option<&str>,
         filter: Option<&str>,
     ) -> Option<cosmos::CosmosSearchResults> {
-        self.try_cosmos_search(query, slug, locale, filter).await.ok()
+        self.try_cosmos_search(query, slug, locale, filter)
+            .await
+            .ok()
     }
 
     /// Like [`cosmos_search`](Self::cosmos_search), but returns a `Result` instead of swallowing errors.

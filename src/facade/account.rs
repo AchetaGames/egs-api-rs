@@ -1,3 +1,4 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::account::{AccountData, AccountInfo, ExternalAuth};
 use crate::api::types::asset_info::GameToken;
@@ -5,7 +6,6 @@ use crate::api::types::entitlement::Entitlement;
 use crate::api::types::epic_asset::EpicAsset;
 use crate::api::types::friends::Friend;
 use crate::api::types::library::Library;
-use crate::EpicGames;
 
 impl EpicGames {
     /// Like [`account_details`](Self::account_details), but returns a `Result` instead of swallowing errors.
@@ -51,7 +51,10 @@ impl EpicGames {
     }
 
     /// Like [`external_auths`](Self::external_auths), but returns a `Result` instead of swallowing errors.
-    pub async fn try_external_auths(&self, account_id: &str) -> Result<Vec<ExternalAuth>, EpicAPIError> {
+    pub async fn try_external_auths(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<ExternalAuth>, EpicAPIError> {
         self.egs.external_auths(account_id).await
     }
 
@@ -113,11 +116,16 @@ impl EpicGames {
     ///
     /// Returns empty `Vec` on API errors.
     pub async fn user_entitlements(&mut self) -> Vec<Entitlement> {
-        self.try_user_entitlements().await.unwrap_or_else(|_| Vec::new())
+        self.try_user_entitlements()
+            .await
+            .unwrap_or_else(|_| Vec::new())
     }
 
     /// Like [`library_items`](Self::library_items), but returns a `Result` instead of swallowing errors.
-    pub async fn try_library_items(&mut self, include_metadata: bool) -> Result<Library, EpicAPIError> {
+    pub async fn try_library_items(
+        &mut self,
+        include_metadata: bool,
+    ) -> Result<Library, EpicAPIError> {
         self.egs.library_items(include_metadata).await
     }
 
