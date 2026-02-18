@@ -91,7 +91,8 @@ egs-api/
 - Custom serde deserializers for Epic's blob number format (`deserialize_epic_string`, `deserialize_epic_hash`)
 - Error handling: API methods return `Result<T, EpicAPIError>`, facade methods return `Option<T>`
 - No external test framework — inline `#[cfg(test)]` modules only
-- Edition 2018 — no 2021+ features
+- Edition 2024 — uses let-chains, latest stable Rust toolchain
+- Clippy enforced with `-D warnings` in CI and test builds
 - Manual `impl Default` for `EpicAPI` and `EpicGames` (delegates to `new()` for proper HTTP client init)
 - Examples use `#[path = "common.rs"] mod common;` for shared auth (Cargo limitation)
 - Token persistence: `~/.egs-api/token.json` (UserData serialized as JSON)
@@ -107,7 +108,7 @@ egs-api/
 
 ## TEST SUITE
 
-68 tests, all passing. Run: `cargo test --tests --lib`
+126 tests, all passing. Run: `cargo test --tests --lib`
 
 | File | Tests | Coverage |
 |------|-------|---------|
@@ -139,11 +140,30 @@ Parsing uses position-tracking via `&mut usize` with helpers in `utils.rs` (`rea
 
 ```bash
 cargo build --lib              # Build library
-cargo test --tests --lib       # Run tests (CI command) — 68 tests
+cargo test --tests --lib       # Run tests (CI command) — 126 tests
+cargo clippy --lib --tests -- -D warnings  # Lint (CI command)
+cargo fmt -- --check           # Check formatting (CI command)
+cargo fmt                      # Auto-format all files
 cargo build --examples         # Build all examples
 cargo run --example auth       # Interactive auth demo (opens browser)
 cargo doc --open               # Generate + view docs (may fail on recent toolchains)
 ```
+
+## CI / PUBLISHING
+
+CI runs on every PR and push to `master` (`.github/workflows/rust.yml`):
+- **Check** — `cargo build --lib` + `cargo test --tests --lib` (latest stable)
+- **Clippy** — `cargo clippy --lib --tests -- -D warnings`
+- **Rustfmt** — `cargo fmt -- --check`
+- **Publish** — auto-publishes to crates.io on `v*` tags (requires `CARGO_REGISTRY_TOKEN` secret)
+
+**To publish a new version:**
+1. Bump version in `Cargo.toml`
+2. Merge to `master`
+3. `git tag v<VERSION> && git push origin v<VERSION>`
+
+**Pre-commit hook:** `.githooks/pre-commit` runs `rustfmt --check` on staged `.rs` files.
+Enable with: `git config core.hooksPath .githooks`
 
 ## COMPLETED WORK (this session)
 
