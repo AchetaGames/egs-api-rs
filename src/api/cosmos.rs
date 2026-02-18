@@ -1,10 +1,10 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::cosmos::{
-    CosmosAccount, CosmosAuthResponse, CosmosCommOptIn, CosmosEulaResponse, CosmosSearchResults,
-    CosmosPolicyAodc,
+    CosmosAccount, CosmosAuthResponse, CosmosCommOptIn, CosmosEulaResponse, CosmosPolicyAodc,
+    CosmosSearchResults,
 };
 use crate::api::types::engine_blob::EngineBlobsResponse;
-use crate::api::EpicAPI;
 use log::{debug, error, warn};
 use serde::Deserialize;
 
@@ -269,10 +269,7 @@ impl EpicAPI {
     ///
     /// Known settings: `email:ue` (Unreal Engine), likely also `email:fn` (Fortnite).
     /// Requires an active Cosmos session.
-    pub async fn cosmos_comm_opt_in(
-        &self,
-        setting: &str,
-    ) -> Result<CosmosCommOptIn, EpicAPIError> {
+    pub async fn cosmos_comm_opt_in(&self, setting: &str) -> Result<CosmosCommOptIn, EpicAPIError> {
         let url = format!(
             "https://www.unrealengine.com/api/cosmos/communication/opt-in?setting={}",
             setting
@@ -367,13 +364,10 @@ impl EpicAPI {
             })?;
 
         if response.status().is_success() {
-            response
-                .json::<CosmosSearchResults>()
-                .await
-                .map_err(|e| {
-                    error!("Failed to parse cosmos search response: {:?}", e);
-                    EpicAPIError::DeserializationError(format!("{}", e))
-                })
+            response.json::<CosmosSearchResults>().await.map_err(|e| {
+                error!("Failed to parse cosmos search response: {:?}", e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();

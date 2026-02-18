@@ -1,8 +1,8 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::cloud_save::CloudSaveResponse;
 use crate::api::types::presence::PresenceUpdate;
 use crate::api::types::service_status::ServiceStatus;
-use crate::EpicGames;
 
 impl EpicGames {
     /// Like [`service_status`](Self::service_status), but returns a `Result` instead of swallowing errors.

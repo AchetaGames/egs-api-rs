@@ -33,9 +33,15 @@ async fn main() {
             if let Some((path, file)) = response.files.iter().next() {
                 println!("\n=== Cloud Save Details (first file) ===\n");
                 println!("  Path:       {}", path);
-                println!("  Filename:   {}", file.file_name.as_deref().unwrap_or("N/A"));
+                println!(
+                    "  Filename:   {}",
+                    file.file_name.as_deref().unwrap_or("N/A")
+                );
                 println!("  Length:     {} bytes", file.length.unwrap_or(0));
-                println!("  Storage:    {}", file.storage_type.as_deref().unwrap_or("N/A"));
+                println!(
+                    "  Storage:    {}",
+                    file.storage_type.as_deref().unwrap_or("N/A")
+                );
                 println!("  ETag:       {}", file.etag.as_deref().unwrap_or("N/A"));
                 if let Some(link) = &file.read_link {
                     println!("  Read link:  {}...", &link[..link.len().min(80)]);
@@ -54,11 +60,7 @@ async fn main() {
             Ok(response) => {
                 println!("  Files: {}", response.files.len());
                 for (path, file) in response.files.iter().take(5) {
-                    println!(
-                        "    {} — {} bytes",
-                        path,
-                        file.length.unwrap_or(0),
-                    );
+                    println!("    {} — {} bytes", path, file.length.unwrap_or(0),);
                 }
             }
             Err(e) => eprintln!("  No cloud saves or error: {:?}", e),

@@ -1,3 +1,4 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
 use crate::api::types::asset_info::AssetInfo;
 use crate::api::types::billing_account::BillingAccount;
@@ -9,7 +10,6 @@ use crate::api::types::quick_purchase::QuickPurchaseResponse;
 use crate::api::types::uplay::{
     UplayClaimResult, UplayCodesResult, UplayGraphQLResponse, UplayRedeemResult,
 };
-use crate::EpicGames;
 
 impl EpicGames {
     /// Like [`catalog_items`](Self::catalog_items), but returns a `Result` instead of swallowing errors.
@@ -69,7 +69,10 @@ impl EpicGames {
     pub async fn try_bulk_catalog_items(
         &self,
         items: &[(&str, &str)],
-    ) -> Result<std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>, EpicAPIError> {
+    ) -> Result<
+        std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>,
+        EpicAPIError,
+    > {
         self.egs.bulk_catalog_items(items).await
     }
 
@@ -83,12 +86,17 @@ impl EpicGames {
     pub async fn bulk_catalog_items(
         &self,
         items: &[(&str, &str)],
-    ) -> Option<std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>> {
+    ) -> Option<std::collections::HashMap<String, std::collections::HashMap<String, AssetInfo>>>
+    {
         self.try_bulk_catalog_items(items).await.ok()
     }
 
     /// Like [`currencies`](Self::currencies), but returns a `Result` instead of swallowing errors.
-    pub async fn try_currencies(&self, start: i64, count: i64) -> Result<CurrencyPage, EpicAPIError> {
+    pub async fn try_currencies(
+        &self,
+        start: i64,
+        count: i64,
+    ) -> Result<CurrencyPage, EpicAPIError> {
         self.egs.currencies(start, count).await
     }
 
@@ -144,7 +152,9 @@ impl EpicGames {
         offer_ids: &[String],
         country: &str,
     ) -> Option<PriceResponse> {
-        self.try_offer_prices(namespace, offer_ids, country).await.ok()
+        self.try_offer_prices(namespace, offer_ids, country)
+            .await
+            .ok()
     }
 
     /// Like [`quick_purchase`](Self::quick_purchase), but returns a `Result` instead of swallowing errors.

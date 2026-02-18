@@ -1,11 +1,11 @@
+use crate::EpicGames;
 use crate::api::error::EpicAPIError;
+use crate::api::types::artifact_service::ArtifactServiceTicket;
 use crate::api::types::asset_info::AssetInfo;
 use crate::api::types::asset_manifest::AssetManifest;
-use crate::api::types::artifact_service::ArtifactServiceTicket;
 use crate::api::types::download_manifest::DownloadManifest;
 use crate::api::types::engine_blob;
 use crate::api::types::epic_asset::EpicAsset;
-use crate::EpicGames;
 
 impl EpicGames {
     /// Like [`list_assets`](Self::list_assets), but returns a `Result` instead of swallowing errors.

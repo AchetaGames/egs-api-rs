@@ -1,14 +1,14 @@
-/// Authentication facade methods
-mod auth;
-/// Asset and manifest facade methods
-mod assets;
 /// Account, social, and entitlement facade methods
 mod account;
-/// Fab marketplace facade methods
-mod fab;
-/// Store, catalog, and commerce facade methods
-mod store;
+/// Asset and manifest facade methods
+mod assets;
+/// Authentication facade methods
+mod auth;
 /// Cosmos / Unreal Engine facade methods
 mod cosmos;
+/// Fab marketplace facade methods
+mod fab;
 /// Miscellaneous facade methods (presence, cloud saves, service status)
 mod misc;
+/// Store, catalog, and commerce facade methods
+mod store;

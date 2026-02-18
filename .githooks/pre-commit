@@ -1,0 +1,34 @@
+#!/bin/sh
+# Pre-commit hook: run rustfmt on staged .rs files
+# Install: git config core.hooksPath .githooks
+
+# Get staged .rs files (only added/modified, not deleted)
+STAGED=$(git diff --cached --name-only --diff-filter=AM | grep '\.rs$')
+
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+# Check if rustfmt is available
+if ! command -v rustfmt >/dev/null 2>&1; then
+    echo "rustfmt not found. Install with: rustup component add rustfmt"
+    exit 1
+fi
+
+# Run rustfmt --check on staged files
+UNFORMATTED=""
+for file in $STAGED; do
+    if ! rustfmt --edition 2024 --check "$file" >/dev/null 2>&1; then
+        UNFORMATTED="$UNFORMATTED $file"
+    fi
+done
+
+if [ -n "$UNFORMATTED" ]; then
+    echo "rustfmt: the following files need formatting:"
+    for file in $UNFORMATTED; do
+        echo "  $file"
+    done
+    echo ""
+    echo "Run 'cargo fmt' to fix, then re-stage."
+    exit 1
+fi

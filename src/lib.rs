@@ -154,7 +154,10 @@ mod facade_tests {
         let mut ud = UserData::new();
         ud.display_name = Some("TestUser".to_string());
         egs.set_user_details(ud);
-        assert_eq!(egs.user_details().display_name, Some("TestUser".to_string()));
+        assert_eq!(
+            egs.user_details().display_name,
+            Some("TestUser".to_string())
+        );
     }
 
     #[test]

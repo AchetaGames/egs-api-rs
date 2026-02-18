@@ -114,14 +114,14 @@ mod tests {
     fn vector_match() {
         let a = vec![0, 0, 0];
         let b = vec![0, 0, 0];
-        assert_eq!(do_vecs_match(&a, &b), true);
+        assert!(do_vecs_match(&a, &b));
     }
 
     #[test]
     fn vector_not_match() {
         let a = vec![0, 0, 0];
         let b = vec![0, 0, 1];
-        assert_eq!(do_vecs_match(&a, &b), false);
+        assert!(!do_vecs_match(&a, &b));
     }
 
     #[test]

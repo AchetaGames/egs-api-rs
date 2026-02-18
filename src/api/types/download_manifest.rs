@@ -1,10 +1,10 @@
 use crate::api::binary_rw::{BinaryReader, BinaryWriter};
+use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use log::{debug, error, warn};
 use reqwest::Url;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 use sha1::{Digest, Sha1};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};

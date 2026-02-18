@@ -1,8 +1,8 @@
-use log::{error, info, warn};
-use reqwest::Response;
 use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::account::UserData;
+use log::{error, info, warn};
+use reqwest::Response;
 
 impl EpicAPI {
     /// Start a new OAuth session with exchange token, authorization code, or refresh token.
@@ -83,12 +83,12 @@ impl EpicAPI {
     /// Resume an existing session by verifying the access token.
     pub async fn resume_session(&mut self) -> Result<bool, EpicAPIError> {
         let url = "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/verify";
-        match self.authorized_get_client(
-            url::Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?
-        ).send().await {
-            Ok(response) => {
-                self.handle_login_response(response).await
-            }
+        match self
+            .authorized_get_client(url::Url::parse(url).map_err(|_| EpicAPIError::InvalidParams)?)
+            .send()
+            .await
+        {
+            Ok(response) => self.handle_login_response(response).await,
             Err(e) => {
                 error!("{:?}", e);
                 Err(EpicAPIError::NetworkError(e))
@@ -127,10 +127,7 @@ impl EpicAPI {
     /// Performs the web-based exchange: set-sid -> csrf -> exchange/generate,
     /// then uses the resulting exchange code to start a session.
     pub async fn auth_sid(&mut self, sid: &str) -> Result<bool, EpicAPIError> {
-        let set_sid_url = format!(
-            "https://www.epicgames.com/id/api/set-sid?sid={}",
-            sid
-        );
+        let set_sid_url = format!("https://www.epicgames.com/id/api/set-sid?sid={}", sid);
         self.client
             .get(&set_sid_url)
             .header(
@@ -188,9 +185,7 @@ impl EpicAPI {
                 EpicAPIError::DeserializationError(format!("{}", e))
             })?;
 
-        let code = exchange_data
-            .code
-            .ok_or(EpicAPIError::InvalidCredentials)?;
+        let code = exchange_data.code.ok_or(EpicAPIError::InvalidCredentials)?;
 
         self.start_session(Some(code), None).await
     }
@@ -198,7 +193,10 @@ impl EpicAPI {
     /// Invalidate the current session (note: method name has a known typo).
     pub async fn invalidate_sesion(&mut self) -> bool {
         if let Some(access_token) = &self.user_data.access_token {
-            let url = format!("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}", access_token);
+            let url = format!(
+                "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/sessions/kill/{}",
+                access_token
+            );
             match self.client.delete(&url).send().await {
                 Ok(_) => {
                     info!("Session invalidated");

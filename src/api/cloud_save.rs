@@ -1,6 +1,6 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::cloud_save::CloudSaveResponse;
-use crate::api::EpicAPI;
 
 impl EpicAPI {
     #[allow(dead_code)]

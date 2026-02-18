@@ -71,10 +71,7 @@ async fn main() {
                 );
             }
         }
-        None => eprintln!(
-            "Failed to fetch asset manifest for {}",
-            test_asset.app_name
-        ),
+        None => eprintln!("Failed to fetch asset manifest for {}", test_asset.app_name),
     }
 
     println!("\n=== Artifact Service Ticket ===\n");

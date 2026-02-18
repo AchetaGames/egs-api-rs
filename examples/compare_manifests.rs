@@ -27,7 +27,10 @@ async fn main() {
     println!("Total EGS assets: {}", assets.len());
 
     if let Some(asset) = assets.first() {
-        println!("Using asset: {} ({})", asset.app_name, asset.catalog_item_id);
+        println!(
+            "Using asset: {} ({})",
+            asset.app_name, asset.catalog_item_id
+        );
 
         if let Some(manifest) = egs
             .asset_manifest(
@@ -71,8 +74,11 @@ async fn main() {
                 println!("Using Fab item: {:?}\n", item);
 
                 // Use the Kite Demo as a known-good test asset, or fall back to first item
-                let (artifact_id, namespace, asset_id) =
-                    ("KiteDemo473", "89efe5924d3d467c839449ab6ab52e7f", "28166226c38a4ff3aa28bbe87dcbbe5b");
+                let (artifact_id, namespace, asset_id) = (
+                    "KiteDemo473",
+                    "89efe5924d3d467c839449ab6ab52e7f",
+                    "28166226c38a4ff3aa28bbe87dcbbe5b",
+                );
 
                 println!("Fetching Fab manifest for artifact: {}", artifact_id);
 
@@ -84,7 +90,10 @@ async fn main() {
                         println!("Got {} download info(s)", download_infos.len());
 
                         if let Some(info) = download_infos.first() {
-                            println!("Distribution point base URLs: {:?}", info.distribution_point_base_urls);
+                            println!(
+                                "Distribution point base URLs: {:?}",
+                                info.distribution_point_base_urls
+                            );
 
                             if let Some(base_url) = info.distribution_point_base_urls.first() {
                                 match egs.fab_download_manifest(info.clone(), base_url).await {
@@ -111,13 +120,20 @@ async fn main() {
     }
 }
 
-fn print_manifest_summary(label: &str, dm: &egs_api::api::types::download_manifest::DownloadManifest) {
+fn print_manifest_summary(
+    label: &str,
+    dm: &egs_api::api::types::download_manifest::DownloadManifest,
+) {
     println!("[{}] App name:      {}", label, dm.app_name_string);
     println!("[{}] Build version: {}", label, dm.build_version_string);
     println!("[{}] Files:         {}", label, dm.file_manifest_list.len());
     println!("[{}] Chunks:        {}", label, dm.chunk_hash_list.len());
     println!("[{}] Total size:    {} bytes", label, dm.total_size());
-    println!("[{}] Download size: {} bytes", label, dm.total_download_size());
+    println!(
+        "[{}] Download size: {} bytes",
+        label,
+        dm.total_download_size()
+    );
 
     // Custom fields — the key comparison point
     println!("\n[{}] Custom fields:", label);
@@ -169,10 +185,16 @@ fn print_manifest_summary(label: &str, dm: &egs_api::api::types::download_manife
     println!("  Files with chunk links:     {}", files_with_links);
     println!("  Files WITHOUT chunk links:  {}", files_without_links);
     println!("  Total chunk parts w/ link:  {}", total_chunks_with_links);
-    println!("  Total chunk parts NO link:  {}", total_chunks_without_links);
+    println!(
+        "  Total chunk parts NO link:  {}",
+        total_chunks_without_links
+    );
 
     if total_chunks_without_links > 0 {
-        println!("\n  *** WARNING: {} chunk parts have no download URL! Downloads will fail. ***", total_chunks_without_links);
+        println!(
+            "\n  *** WARNING: {} chunk parts have no download URL! Downloads will fail. ***",
+            total_chunks_without_links
+        );
     } else if total_chunks_with_links > 0 {
         println!("\n  All chunk parts have valid download URLs.");
     }
@@ -194,7 +216,11 @@ fn print_manifest_summary(label: &str, dm: &egs_api::api::types::download_manife
             println!(
                 "\n[{}] Sample: file={}, chunk_guid={}, url={}",
                 label,
-                if filename.len() > 60 { &filename[..60] } else { filename },
+                if filename.len() > 60 {
+                    &filename[..60]
+                } else {
+                    filename
+                },
                 part.guid,
                 url_display
             );

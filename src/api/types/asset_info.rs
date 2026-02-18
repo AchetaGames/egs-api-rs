@@ -46,10 +46,10 @@ pub struct AssetInfo {
 impl AssetInfo {
     /// Get the latest release by release_date
     pub fn latest_release(&self) -> Option<ReleaseInfo> {
-        if let Some(releases) = self.sorted_releases() {
-            if let Some(rel) = releases.first() {
-                return Some(rel.clone());
-            }
+        if let Some(releases) = self.sorted_releases()
+            && let Some(rel) = releases.first()
+        {
+            return Some(rel.clone());
         }
         None
     }

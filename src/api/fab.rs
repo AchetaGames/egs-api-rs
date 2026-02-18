@@ -1,8 +1,8 @@
+use crate::api::EpicAPI;
 use crate::api::error::EpicAPIError;
 use crate::api::types::download_manifest::DownloadManifest;
 use crate::api::types::fab_asset_manifest::DownloadInfo;
 use crate::api::types::fab_library::FabLibrary;
-use crate::api::EpicAPI;
 use log::{debug, error, warn};
 use std::borrow::BorrowMut;
 use url::Url;
@@ -185,15 +185,15 @@ impl EpicAPI {
         if let Some(ref in_filter) = params.in_filter {
             query_parts.push(format!("in={}", in_filter));
         }
-        if let Some(is_discounted) = params.is_discounted {
-            if is_discounted {
-                query_parts.push("is_discounted=true".to_string());
-            }
+        if let Some(is_discounted) = params.is_discounted
+            && is_discounted
+        {
+            query_parts.push("is_discounted=true".to_string());
         }
-        if let Some(is_free) = params.is_free {
-            if is_free {
-                query_parts.push("is_free=1".to_string());
-            }
+        if let Some(is_free) = params.is_free
+            && is_free
+        {
+            query_parts.push("is_free=1".to_string());
         }
         if let Some(pct) = params.min_discount_percentage {
             query_parts.push(format!("min_discount_percentage={}", pct));
@@ -311,14 +311,16 @@ impl EpicAPI {
     pub async fn fab_licenses(
         &self,
     ) -> Result<Vec<crate::api::types::fab_taxonomy::FabLicenseType>, EpicAPIError> {
-        self.get_json("https://www.fab.com/i/taxonomy/licenses").await
+        self.get_json("https://www.fab.com/i/taxonomy/licenses")
+            .await
     }
 
     /// Fetch asset format groups. Public endpoint.
     pub async fn fab_format_groups(
         &self,
     ) -> Result<Vec<crate::api::types::fab_taxonomy::FabFormatGroup>, EpicAPIError> {
-        self.get_json("https://www.fab.com/i/taxonomy/asset-format-groups").await
+        self.get_json("https://www.fab.com/i/taxonomy/asset-format-groups")
+            .await
     }
 
     /// Fetch tag groups with nested tags. Public endpoint.
@@ -332,10 +334,9 @@ impl EpicAPI {
     }
 
     /// Fetch available UE versions. Public endpoint.
-    pub async fn fab_ue_versions(
-        &self,
-    ) -> Result<Vec<String>, EpicAPIError> {
-        self.get_json("https://www.fab.com/i/unreal-engine/versions").await
+    pub async fn fab_ue_versions(&self) -> Result<Vec<String>, EpicAPIError> {
+        self.get_json("https://www.fab.com/i/unreal-engine/versions")
+            .await
     }
 
     /// Fetch channel info by slug. Public endpoint.
@@ -401,8 +402,8 @@ impl EpicAPI {
 
     /// Initialize Fab CSRF token. Sets `fab_csrftoken` cookie on the client.
     pub async fn fab_csrf(&self) -> Result<(), EpicAPIError> {
-        let parsed_url =
-            url::Url::parse("https://www.fab.com/i/csrf").map_err(|_| EpicAPIError::InvalidParams)?;
+        let parsed_url = url::Url::parse("https://www.fab.com/i/csrf")
+            .map_err(|_| EpicAPIError::InvalidParams)?;
         let response = Self::send(self.client.get(parsed_url)).await?;
         if response.status().is_success() {
             Ok(())
