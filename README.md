@@ -263,6 +263,14 @@ via `custom_field(key)`.
 
 ```
 EpicGames (public facade, src/lib.rs)
+  ├── facade/
+  │     ├── auth.rs     — Login, logout, auth_code, auth_sid, credentials
+  │     ├── assets.rs   — Asset listing, manifests, download manifests
+  │     ├── account.rs  — Account details, friends, entitlements, library
+  │     ├── fab.rs      — Fab search, listings, library, downloads
+  │     ├── store.rs    — Catalog, commerce, Uplay
+  │     ├── cosmos.rs   — Cosmos session, EULA, account
+  │     └── misc.rs     — Presence, cloud saves, service status
   └── EpicAPI (internal, src/api/mod.rs)
         ├── login.rs    — OAuth: start, resume, invalidate
         ├── egs.rs      — Assets, manifests, library, cloud saves, tokens
@@ -275,6 +283,37 @@ EpicGames (public facade, src/lib.rs)
 `EpicGames` is the consumer-facing struct. It delegates to `EpicAPI` which
 holds the `reqwest::Client` (with cookie store) and `UserData` (session state).
 API methods are split across files via `impl EpicAPI` blocks.
+
+## Development
+
+```bash
+cargo build --lib                          # Build library
+cargo test --tests --lib                   # Run tests (126 tests)
+cargo clippy --lib --tests -- -D warnings  # Lint
+cargo fmt                                  # Format code
+```
+
+**Pre-commit hook:** Checks `rustfmt` on staged `.rs` files before commit.
+```bash
+git config core.hooksPath .githooks
+```
+
+## CI / Publishing
+
+CI runs on every PR and push to `master` (`.github/workflows/rust.yml`):
+- **Check** — `cargo build --lib` + `cargo test --tests --lib` (latest stable)
+- **Clippy** — `cargo clippy --lib --tests -- -D warnings`
+- **Rustfmt** — `cargo fmt -- --check`
+- **Publish** — auto-publishes to crates.io on `v*` tags (requires `CARGO_REGISTRY_TOKEN` secret)
+
+**To publish a new version:**
+1. Bump `version` in `Cargo.toml`
+2. Merge to `master`
+3. Tag and push:
+```bash
+git tag v<VERSION>
+git push origin v<VERSION>
+```
 
 ## License
 

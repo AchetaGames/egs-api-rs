@@ -213,7 +213,7 @@ Items 10 (Default fix) and partial item 12 (sync tests) are already done.
 ## NOTES
 
 - Published to crates.io as `egs-api`; docs at docs.rs/egs-api
-- CI uses `actions/checkout@v2` (outdated) with no clippy/rustfmt/audit steps
+- CI uses `actions/checkout@v4`, `dtolnay/rust-toolchain@stable`, `Swatinem/rust-cache` with clippy/rustfmt/publish jobs
 - Fab API returns 403 on timeout → mapped to `EpicAPIError::FabTimeout`
 - `UserData::update()` merges only `Some` fields — partial update pattern for token refresh
 - `download_manifest.rs` supports both JSON and binary manifest formats; `parse()` tries binary first, falls back to JSON
