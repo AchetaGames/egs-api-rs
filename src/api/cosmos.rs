@@ -106,6 +106,9 @@ impl EpicAPI {
                 EpicAPIError::NetworkError(e)
             })?;
         debug!("set-sid status={}", set_sid_resp.status());
+        for cookie in set_sid_resp.cookies() {
+            debug!("set-sid cookie: {}={} (domain={:?})", cookie.name(), &cookie.value()[..20.min(cookie.value().len())], cookie.domain());
+        }
 
         self.cosmos_auth_upgrade().await
     }
@@ -307,10 +310,13 @@ impl EpicAPI {
         platform: &str,
     ) -> Result<EngineBlobsResponse, EpicAPIError> {
         let url = format!("https://www.unrealengine.com/api/blobs/{}", platform);
+        debug!("Fetching engine versions from: {}", url);
+
         let response = self
             .client
             .get(&url)
             .header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .send()
             .await
             .map_err(|e| {
@@ -319,7 +325,21 @@ impl EpicAPI {
             })?;
 
         if response.status().is_success() {
-            response.json::<EngineBlobsResponse>().await.map_err(|e| {
+            let body = response.text().await.map_err(|e| {
+                error!("Failed to read engine versions response body: {:?}", e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            debug!("engine_versions raw response ({} chars): {}", body.len(), &body[..500.min(body.len())]);
+
+            if let Some(err_msg) = serde_json::from_str::<std::collections::HashMap<String, String>>(&body)
+                .ok()
+                .and_then(|m| m.get("error").cloned())
+            {
+                warn!("blobs/{} returned error: {}", platform, err_msg);
+                return Err(EpicAPIError::InvalidCredentials);
+            }
+
+            serde_json::from_str::<EngineBlobsResponse>(&body).map_err(|e| {
                 error!("Failed to parse engine versions response: {:?}", e);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
