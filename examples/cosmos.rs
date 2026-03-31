@@ -5,8 +5,6 @@
 #[path = "common.rs"]
 mod common;
 
-use egs_api::api::types::cosmos::CosmosEulaResponse;
-
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -37,12 +35,11 @@ async fn main() {
         auth.bearer_token_valid, auth.upgraded_bearer_token
     );
 
-    // Check EULA acceptance
-    let eula: CosmosEulaResponse = egs
-        .try_cosmos_eula_check("unreal_engine2", "en")
-        .await
-        .expect("EULA check failed");
-    println!("UE EULA accepted: {}", eula.accepted);
+    // Check EULA acceptance (IDs may change, known: unreal_engine, unreal_engine2)
+    match egs.try_cosmos_eula_check("unreal_engine2", "en").await {
+        Ok(eula) => println!("UE EULA accepted: {}", eula.accepted),
+        Err(e) => eprintln!("EULA check failed (ID may have changed): {}", e),
+    }
 
     // Get Cosmos account info
     if let Some(account) = egs.cosmos_account().await {

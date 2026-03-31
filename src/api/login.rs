@@ -71,6 +71,8 @@ impl EpicAPI {
             }
         };
 
+        self.user_data.error_message = None;
+        self.user_data.error_code = None;
         self.user_data.update(new);
 
         if let Some(m) = &self.user_data.error_message {
