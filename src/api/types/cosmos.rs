@@ -44,7 +44,7 @@ pub struct CosmosAccount {
 /// Response from `GET/POST /api/cosmos/eula/accept`.
 ///
 /// GET checks if a EULA is accepted; POST accepts it.
-/// Known EULA IDs: `unreal_engine`, `unreal_engine2`, `realityscan`, `mhc`, `content`
+/// Known EULA IDs: `unreal_engine`, `unreal_engine2`, `ue`, `mhc`
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

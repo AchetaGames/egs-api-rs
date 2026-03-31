@@ -106,6 +106,9 @@ impl EpicAPI {
                 EpicAPIError::NetworkError(e)
             })?;
         debug!("set-sid status={}", set_sid_resp.status());
+        for cookie in set_sid_resp.cookies() {
+            debug!("set-sid cookie: {}={} (domain={:?})", cookie.name(), &cookie.value()[..20.min(cookie.value().len())], cookie.domain());
+        }
 
         self.cosmos_auth_upgrade().await
     }
@@ -141,7 +144,7 @@ impl EpicAPI {
     /// Check if a EULA has been accepted.
     ///
     /// Requires an active Cosmos session (call `cosmos_session_setup` first).
-    /// Known EULA IDs: `unreal_engine`, `unreal_engine2`, `realityscan`, `mhc`, `content`.
+    /// Known EULA IDs: `unreal_engine`, `unreal_engine2`, `ue`, `mhc`.
     pub async fn cosmos_eula_check(
         &self,
         eula_id: &str,
@@ -302,15 +305,56 @@ impl EpicAPI {
     ///
     /// Requires an active Cosmos session (cookies from set-sid + cosmos/auth).
     /// Platform values: `linux`, `windows`, `mac`
+    ///
+    /// Tries the JSON API (`/api/blobs/{platform}`) first.
+    /// If that fails or returns empty on `linux`, it falls back to scraping
+    /// the Linux download page HTML. For `windows` and `mac`, scraping is skipped.
     pub async fn engine_versions(
         &self,
         platform: &str,
     ) -> Result<EngineBlobsResponse, EpicAPIError> {
+        match self.engine_versions_api(platform).await {
+            Ok(resp) if !resp.blobs.is_empty() => Ok(resp),
+            Ok(resp) => {
+                if platform == "linux" {
+                    debug!("API returned empty blobs, trying Linux page fallback");
+                    self.engine_versions_from_page().await
+                } else {
+                    warn!(
+                        "API returned empty blobs for '{}'. Linux page fallback is disabled for this platform",
+                        platform
+                    );
+                    Ok(resp)
+                }
+            }
+            Err(e) => {
+                if platform == "linux" {
+                    debug!("API failed ({}), trying Linux page fallback", e);
+                    self.engine_versions_from_page().await
+                } else {
+                    warn!(
+                        "API failed for '{}'. Linux page fallback is disabled for this platform",
+                        platform
+                    );
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    /// Try the direct JSON API endpoint (may be deprecated).
+    async fn engine_versions_api(
+        &self,
+        platform: &str,
+    ) -> Result<EngineBlobsResponse, EpicAPIError> {
         let url = format!("https://www.unrealengine.com/api/blobs/{}", platform);
+        debug!("Fetching engine versions from API: {}", url);
+
         let response = self
             .client
             .get(&url)
             .header("Accept", "application/json")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .send()
             .await
             .map_err(|e| {
@@ -319,7 +363,21 @@ impl EpicAPI {
             })?;
 
         if response.status().is_success() {
-            response.json::<EngineBlobsResponse>().await.map_err(|e| {
+            let body = response.text().await.map_err(|e| {
+                error!("Failed to read engine versions response body: {:?}", e);
+                EpicAPIError::DeserializationError(format!("{}", e))
+            })?;
+            debug!("engine_versions raw response ({} chars): {}", body.len(), &body[..500.min(body.len())]);
+
+            if let Some(err_msg) = serde_json::from_str::<std::collections::HashMap<String, String>>(&body)
+                .ok()
+                .and_then(|m| m.get("error").cloned())
+            {
+                warn!("blobs/{} returned error: {}", platform, err_msg);
+                return Err(EpicAPIError::InvalidCredentials);
+            }
+
+            serde_json::from_str::<EngineBlobsResponse>(&body).map_err(|e| {
                 error!("Failed to parse engine versions response: {:?}", e);
                 EpicAPIError::DeserializationError(format!("{}", e))
             })
@@ -329,6 +387,116 @@ impl EpicAPI {
             warn!("blobs/{} failed: {} {}", platform, status, body);
             Err(EpicAPIError::HttpError { status, body })
         }
+    }
+
+    async fn engine_versions_from_page(&self) -> Result<EngineBlobsResponse, EpicAPIError> {
+        let url = "https://www.unrealengine.com/en-US/linux";
+        debug!("Fetching engine versions from page: {}", url);
+
+        let response = self
+            .client
+            .get(url)
+            .header("Accept", "text/html")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to fetch engine page: {:?}", e);
+                EpicAPIError::NetworkError(e)
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!("Engine page fetch failed: {} {}", status, &body[..200.min(body.len())]);
+            return Err(EpicAPIError::HttpError { status, body });
+        }
+
+        let html = response.text().await.map_err(|e| {
+            error!("Failed to read engine page body: {:?}", e);
+            EpicAPIError::DeserializationError(format!("{}", e))
+        })?;
+        debug!("Engine page HTML: {} chars", html.len());
+
+        let blobs = Self::extract_blobs_from_html(&html)?;
+        debug!("Extracted {} blobs from page HTML", blobs.len());
+        Ok(EngineBlobsResponse { blobs })
+    }
+
+    /// Extract the blob array from the page HTML.
+    ///
+    /// The page embeds blob data in React Server Component `__next_f` script
+    /// tags as JS string literals (quotes escaped as `\"`). This method
+    /// unescapes the JS strings first, then extracts the `"blobs":[...]`
+    /// array using bracket counting.
+    ///
+    /// If Epic changes the page structure, update the `MARKER` constant.
+    fn extract_blobs_from_html(
+        html: &str,
+    ) -> Result<Vec<crate::api::types::engine_blob::EngineBlob>, EpicAPIError> {
+        const MARKER: &str = "\"blobs\":[{";
+
+        let text = if html.contains(MARKER) {
+            std::borrow::Cow::Borrowed(html)
+        } else {
+            std::borrow::Cow::Owned(html.replace("\\\"", "\""))
+        };
+
+        let marker_pos = text.find(MARKER).ok_or_else(|| {
+            error!("Could not find blob data marker in page HTML");
+            EpicAPIError::DeserializationError(
+                "blob data not found in page HTML, Epic may have changed the page structure".into(),
+            )
+        })?;
+
+        let array_start = marker_pos + "\"blobs\":".len();
+        let text_bytes = text.as_bytes();
+
+        let mut depth: u32 = 0;
+        let mut array_end = array_start;
+        let mut in_string = false;
+        let mut escape_next = false;
+
+        for (i, &byte) in text_bytes[array_start..].iter().enumerate() {
+            if escape_next {
+                escape_next = false;
+                continue;
+            }
+            match byte {
+                b'\\' if in_string => escape_next = true,
+                b'"' => in_string = !in_string,
+                b'[' if !in_string => depth += 1,
+                b']' if !in_string => {
+                    depth -= 1;
+                    if depth == 0 {
+                        array_end = array_start + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if depth != 0 {
+            error!("Unmatched brackets while parsing blob array from HTML");
+            return Err(EpicAPIError::DeserializationError(
+                "malformed blob array in page HTML".into(),
+            ));
+        }
+
+        let array_json = &text[array_start..array_end];
+        let clean = array_json
+            .replace("\\u0026", "&")
+            .replace("\\u003c", "<")
+            .replace("\\u003e", ">");
+
+        serde_json::from_str(&clean).map_err(|e| {
+            error!(
+                "Failed to parse blobs from HTML (first 200 chars): {}",
+                &clean[..200.min(clean.len())]
+            );
+            EpicAPIError::DeserializationError(format!("blob JSON parse error: {}", e))
+        })
     }
 
     /// Search unrealengine.com content. Requires an active Cosmos session.
@@ -374,5 +542,35 @@ impl EpicAPI {
             warn!("cosmos/search failed: {} {}", status, body);
             Err(EpicAPIError::HttpError { status, body })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_blobs_from_rsc_payload_escaped() {
+        let html = r#"<script>self.__next_f.push([1,"stuff\"blobs\":[{\"name\":\"Linux_Unreal_Engine_5.7.4.zip\",\"createdAt\":\"2026-03-10T12:46:39.745Z\",\"size\":32073680226,\"downloadUrl\":\"https://ucs-blob-store.s3-accelerate.amazonaws.com/blobs/40/f8/test\",\"version\":\"\",\"semver\":\"\",\"operatingSystem\":\"\"},{\"name\":\"Linux_Fab_5.7.0_0.0.7.zip\",\"createdAt\":\"2025-11-12T14:16:21.834Z\",\"size\":26745370,\"downloadUrl\":\"https://example.com/fab\",\"version\":\"\",\"semver\":\"\",\"operatingSystem\":\"\"}]rest"])</script>"#;
+        let blobs = EpicAPI::extract_blobs_from_html(html).unwrap();
+        assert_eq!(blobs.len(), 2);
+        assert_eq!(blobs[0].name, "Linux_Unreal_Engine_5.7.4.zip");
+        assert_eq!(blobs[0].size, 32073680226);
+        assert!(blobs[0].download_url.starts_with("https://"));
+        assert_eq!(blobs[1].name, "Linux_Fab_5.7.0_0.0.7.zip");
+    }
+
+    #[test]
+    fn extract_blobs_unescaped() {
+        let html = r#"stuff "blobs":[{"name":"test.zip","createdAt":"2026-01-01T00:00:00Z","size":100,"downloadUrl":"https://example.com?foo=1\u0026bar=2","version":"","semver":"","operatingSystem":""}] more"#;
+        let blobs = EpicAPI::extract_blobs_from_html(html).unwrap();
+        assert_eq!(blobs.len(), 1);
+        assert_eq!(blobs[0].download_url, "https://example.com?foo=1&bar=2");
+    }
+
+    #[test]
+    fn extract_blobs_missing_marker() {
+        let html = "<html><body>no blob data here</body></html>";
+        assert!(EpicAPI::extract_blobs_from_html(html).is_err());
     }
 }
